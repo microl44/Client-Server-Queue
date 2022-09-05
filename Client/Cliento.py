@@ -2,6 +2,9 @@ import zmq
 import json
 import time
 
+# Basic client which connects to tinyqueue webserver, prompts the user for input, sends a request to enter queue and sends a subscribe request. Queue is then constantly updated.
+
+
 context = zmq.Context()
 # Socket to talk to server
 print("Connecting to server...")
