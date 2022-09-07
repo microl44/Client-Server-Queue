@@ -10,34 +10,23 @@ context = zmq.Context()
 print("Connecting to server...")
 socket = context.socket(zmq.DEALER)
 
-if socket.connect("tcp://tinyqueue.cognitionreversed.com:5556"):
+serverList = []
+
+if socket.connect("tcp://127.0.0.1:5555"):
 
 	queueName = input("Enter your Queue Alias: ")
 
-	ticket = {'enterQueue':True, 'name':queueName}
-	socket.send_json(ticket)
-	message = socket.recv_json()
-
-	if 'ticket' and 'name' in message:
-		print(message['ticket'])
-		print(message['name'])
-
-
-	subReq = {'subscribe':True}
-	socket.send_json(subReq)
+	message = ""
 
 	while True:
+		socket.send_string(queueName)
 
-		message = socket.recv_json()
+		time.sleep(1)
 
-		if 'queue' and 'supervisors' in message:
-			templist = str(message['queue']).split(',')
-			for i in templist:
-				print(i + "\n")
+		message = socket.recv_multipart()
 
-		if not message:
-			socket.send_json({''})
-
+		if(message[0] not in serverList):
+			serverList.append(message[0])
 	#sub = {'subscribe':True}
 
 
