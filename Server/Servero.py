@@ -47,19 +47,62 @@ while True:
             # Encode message
             messageRes = str.encode(messageRes)
             
-            #Send message
-            msg = [clientID]
-
+            #Send message back to client
+            msg = [clientID, messageRes]
+            socket.send_multipart(msg)
+            
+    # If client want status update
+    if 'subscribe' in messageDict:
+        # Check if client want to subscribe
+        if messageDict['subscribe']:
+            # Check if client is already subscribed
+            if clientID not in subsQueue:
+                subsQueue.append(clientID)
+                print('Client successfully subscribed...')
+            
+            else:
+                print('Client is already subscribed...')
+                
+            # Prepare and send message to client
+            statusDict = {'queue' : queueTickets}
+            messageRes = json.dumps(statusDict)
+            messageRes = str.encode(messageRes)
+            msg = [clientID, messageRes]
+            print(msg)
+            socket.send_multipart(msg)
+        
+        # Unsubscribe client
+        else:
+            # Remove client from list as long as list is not empty
+            if subsQueue:
+                # If client is subscribed
+                if clientID in subsQueue:
+                    subsQueue.pop(subsQueue.index(clientID))
+                    print('Client has been unsubscribed...')
+                
+                else:
+                    print('Client not found in queue...')
+            
+            else:
+                print('No clients are subscribed...')
+    
+    # If queue has been updated            
     if updateStatus:
-        for client in clientIDsList:
-            statusDict = {'queue':queueTickets}
-            statusDict = json.dumps(statusDict)
-            statusDict = str.encode(statusDict)
-            temo = [client, statusDict]
-            print(temo)
-            socket.send_multipart(temo)
+        # For every client in the subscribed list
+        for client in subsQueue:
+            # Prepare and send message to client
+            statusDict = {'queue' : queueTickets}
+            messageRes = json.dumps(statusDict)
+            messageRes = str.encode(messageRes)
+            msg = [clientID, messageRes]
+            socket.send_multipart(msg)
+        # Reset status
         updateStatus = False
+        
     else:
+        messageRes = {}
+        messageRes = json.dumps(messageRes)
+        messageRes = str.encode(messageRes)
         temp = [clientID, messageRes]
     # Send reply back to client
         socket.send_multipart(temp)
