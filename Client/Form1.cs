@@ -18,7 +18,7 @@ namespace ClientGUI
 {
     public partial class Form1 : Form
     {
-        public static string CurrentQueue = "hello!";
+        public static string CurrentQueue;
         public Form1()
         {
             InitializeComponent();
@@ -30,10 +30,12 @@ namespace ClientGUI
 
             Connecter.socket.Connect("tcp://localhost:5555");
 
-            RichTextBox richBox = richTextBox1;
 
-            Thread doSomething = new Thread(() => ThreadWork(richBox));
+            Thread doSomething = new Thread(() => ThreadWork());
             doSomething.Start();
+
+            Thread UpdateGUI = new Thread(() => ThreadWork2ElectricBogaloo());
+            UpdateGUI.Start();
         }
 
         public class Connecter
@@ -71,7 +73,7 @@ namespace ClientGUI
             Connecter.socket.SendFrame(MessageToSend);
         }
 
-        public void ThreadWork(RichTextBox boxToUpdate)
+        public void ThreadWork()
         {
             while (true)
             {
@@ -79,49 +81,74 @@ namespace ClientGUI
                 var content = Encoding.UTF8.GetString(Connecter.messageToRecieve[0].Buffer);
 
                 JObject jsonContent = JObject.Parse(content);
+                System.Diagnostics.Debug.WriteLine(jsonContent);
 
                 if (jsonContent.ContainsKey("ticket"))
                 {
                     Connecter.currentPlace = jsonContent.GetValue("ticket").ToString();
-                    System.Diagnostics.Debug.WriteLine(Connecter.currentPlace);
-                    Connecter.textBoxText = jsonContent.GetValue("ticket").ToString();
                 }
                 else if (jsonContent.ContainsKey("queue"))
                 {
-                    System.Diagnostics.Debug.WriteLine(jsonContent.GetValue("queue").ToString());
+                    extractQueue(jsonContent);
                 }
-                else if (jsonContent.ContainsKey(null))
-
-                foreach (var pair in jsonContent)
+                /*else if(jsonContent.Count < 1)
                 {
-                    System.Diagnostics.Debug.WriteLine(pair);
-                }
+                    string heartbeat = "{}";
+                    SendMessage(heartbeat);
+                }*/
             }
         }
 
         public void changeTextBox()
         {
-            richTextBox1.Text = CurrentQueue;
+            richTextBox1.Invoke((MethodInvoker)(() => richTextBox1.Text = CurrentQueue));
         }
 
-        private void richTextBox1_TextChanged(object sender, EventArgs e)
+        public void clearTextBox()
         {
-
+            richTextBox1.Invoke((MethodInvoker)(() => richTextBox1.Text = ""));
         }
 
-        private void label1_Click(object sender, EventArgs e)
+        public string extractQueue(JObject Jmessage)
         {
+            CurrentQueue = "";
+            List<string> tempList = new List<string>();
+            if(Jmessage.ContainsKey("queue"))
+            {
+                foreach (var x in Jmessage.GetValue("queue"))
+                {
+                    tempList.Add(x["ticket"].ToString() + " ");
+                    tempList.Add(x["name"].ToString() + "\n");
+                }
 
+                foreach (string s in tempList)
+                {
+                    CurrentQueue = CurrentQueue + s;
+                }
+            }
+            return null;
         }
 
-        private void textBox1_TextChanged(object sender, EventArgs e)
+        public void ThreadWork2ElectricBogaloo()
         {
-
+            Thread.Sleep(4000);
+            string lastSavedText = "";
+            while (true)
+            {
+                if (lastSavedText != CurrentQueue)
+                {
+                    lastSavedText = CurrentQueue;
+                    changeTextBox();
+                }
+            }
         }
 
-        private void BtnUpdateUI(object sender, EventArgs e)
+        private void button4_Click(object sender, EventArgs e)
         {
-            richTextBox1.Text = CurrentQueue;
+            string RemovesubscribeToQueue = "{\"subscribe\":false}";
+            SendMessage(RemovesubscribeToQueue);
+            clearTextBox();
+            CurrentQueue = "";
         }
     }
 }

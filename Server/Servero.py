@@ -1,13 +1,17 @@
+from asyncio import format_helpers
 from http import client
 import zmq
 import time
 import json
+import threading
+
+print('Server is starting...')
 
 context = zmq.Context()
 socket = context.socket(zmq.ROUTER)
 socket.bind('tcp://*:5555')
 
-print('Server is starting...')
+print('Configuring server... Please wait...')
 
 # Create a queue to hold the waiting clients
 queueTickets = []
@@ -34,25 +38,106 @@ while True:
     if 'enterQueue' in messageDict:
         # If want to join queue
         if messageDict['enterQueue']:
+            # Set to send status to all
+            updateStatus = True
+            print('Adding protocol')
             # Should update status for everybody
             updateStatus = True
-            # Check if already in queue
-            if clientID not in queueTickets:
-                clientQueue.append(clientID)
-            
-            # Create a response to the client for request
-            ticketDict = {'ticket': clientQueue.index(clientID), 'name': messageDict['name']}
-            queueTickets.append(ticketDict)
-            messageRes = json.dumps(ticketDict)
-            # Encode message
-            messageRes = str.encode(messageRes)
-            
-            #Send message back to client
-            msg = [clientID, messageRes]
-            socket.send_multipart(msg)
-            
+            # Check if new client wants to join queue
+            if not clientQueue:
+                print('Protocol 1.1')
+                # Add first to queue
+                clientQueue.append([clientID, messageDict['name']])     
+                # Create a response to the client for request
+                ticketDict = {'ticket': 0, 'name': messageDict['name']}
+                queueTickets.append(ticketDict)
+                messageRes = json.dumps(ticketDict)
+                # Encode message
+                messageRes = str.encode(messageRes)
+                
+                #Send message back to client
+                msg = [clientID, messageRes]
+                socket.send_multipart(msg)
+                print('Server: Client is first to enter queue... New ticket...')
+            else:
+                # Value to determine if match is found
+                clientMatch = False
+                print('Protocol 2.1')
+                for pair in clientQueue:
+                    # Check if requesting client is already in queue
+                    if clientID in pair:
+                        print('Protocol 2.1.1')
+                        # Match found
+                        clientMatch = True
+                        clientNameMatch = False
+                        # Check if new clients uses old alias
+                        for ticket in queueTickets:
+                            if messageDict['name'] == ticket['name']:
+                                # Match found
+                                clientNameMatch = True
+                                #Prepare message
+                                messageRes = json.dumps(ticket)
+                                messageRes = str.encode(messageRes)
+                                
+                                #Send message back to client
+                                msg = [clientID, messageRes]
+                                socket.send_multipart(msg)
+                                print('Server: Client with that name is already in queue, returned same ticket...')
+                                break
+                        # Old client uses new alias
+                        if not clientNameMatch:    
+                            # Add old client with old name to queue
+                            clientQueue.append([clientID, messageDict['name']])     
+                            # Create a response to the client for request
+                            ticketDict = {'ticket': clientQueue.index(pair), 'name': messageDict['name']}
+                            queueTickets.append(ticketDict)
+                            messageRes = json.dumps(ticketDict)
+                            # Encode message
+                            messageRes = str.encode(messageRes)
+                            
+                            #Send message back to client
+                            msg = [clientID, messageRes]
+                            socket.send_multipart(msg)
+                            print('Server: Old client and new alias identified... New ticket...')
+                        break
+                # New client
+                if not clientMatch:
+                    print('Protocol 2.2')
+                    # Match found
+                    clientNameMatch = False
+                    # Check if old client uses old alias
+                    for ticket in queueTickets:
+                        if messageDict['name'] == ticket['name']:
+                            # Match found
+                            clientNameMatch = True
+                            #Prepare message
+                            messageRes = json.dumps(ticket)
+                            messageRes = str.encode(messageRes)
+                            
+                            #Send message back to client
+                            msg = [clientID, messageRes]
+                            socket.send_multipart(msg)
+                            print('Server: New client, old name identified... New ticket...')
+                            break
+                    # New client uses new alias
+                    if not clientNameMatch:
+                        #Add new client with new name to queue
+                        clientQueue.append([clientID, messageDict['name']])     
+                        # Create a response to the client for request
+                        ticketDict = {'ticket': clientQueue.index(pair), 'name': messageDict['name']}
+                        queueTickets.append(ticketDict)
+                        messageRes = json.dumps(ticketDict)
+                        # Encode message
+                        messageRes = str.encode(messageRes)
+                        
+                        #Send message back to client
+                        msg = [clientID, messageRes]
+                        socket.send_multipart(msg)
+                        print('Server: New client and new alias identified... New ticket...')        
+
     # If client want status update
     if 'subscribe' in messageDict:
+        print('My name is Don peo')
         # Check if client want to subscribe
         if messageDict['subscribe']:
             # Check if client is already subscribed
