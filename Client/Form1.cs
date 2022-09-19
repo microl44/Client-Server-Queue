@@ -18,6 +18,7 @@ namespace ClientGUI
 {
     public partial class Form1 : Form
     {
+        public static string CurrentQueue = "hello!";
         public Form1()
         {
             InitializeComponent();
@@ -29,7 +30,9 @@ namespace ClientGUI
 
             Connecter.socket.Connect("tcp://localhost:5555");
 
-            Thread doSomething = new Thread(ThreadWork);
+            RichTextBox richBox = richTextBox1;
+
+            Thread doSomething = new Thread(() => ThreadWork(richBox));
             doSomething.Start();
         }
 
@@ -41,6 +44,7 @@ namespace ClientGUI
             public static NetMQRuntime asyncSocket;
 
             public static string currentPlace;
+            public static string textBoxText;
         }
 
         private void BtnEnterQueue_Click(object sender, EventArgs e)
@@ -52,6 +56,7 @@ namespace ClientGUI
             }
 
             string enterQueueTicket = "{\"enterQueue\":true,\"name\":\"" + username + "\"}";
+
             SendMessage(enterQueueTicket);
         }
 
@@ -66,7 +71,7 @@ namespace ClientGUI
             Connecter.socket.SendFrame(MessageToSend);
         }
 
-        public void ThreadWork()
+        public void ThreadWork(RichTextBox boxToUpdate)
         {
             while (true)
             {
@@ -79,17 +84,24 @@ namespace ClientGUI
                 {
                     Connecter.currentPlace = jsonContent.GetValue("ticket").ToString();
                     System.Diagnostics.Debug.WriteLine(Connecter.currentPlace);
+                    Connecter.textBoxText = jsonContent.GetValue("ticket").ToString();
                 }
                 else if (jsonContent.ContainsKey("queue"))
                 {
                     System.Diagnostics.Debug.WriteLine(jsonContent.GetValue("queue").ToString());
                 }
+                else if (jsonContent.ContainsKey(null))
 
                 foreach (var pair in jsonContent)
                 {
                     System.Diagnostics.Debug.WriteLine(pair);
                 }
             }
+        }
+
+        public void changeTextBox()
+        {
+            richTextBox1.Text = CurrentQueue;
         }
 
         private void richTextBox1_TextChanged(object sender, EventArgs e)
@@ -105,6 +117,11 @@ namespace ClientGUI
         private void textBox1_TextChanged(object sender, EventArgs e)
         {
 
+        }
+
+        private void BtnUpdateUI(object sender, EventArgs e)
+        {
+            richTextBox1.Text = CurrentQueue;
         }
     }
 }
