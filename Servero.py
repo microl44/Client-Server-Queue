@@ -16,7 +16,7 @@ t = 15
 
 def protocol_Heartbeat():
     # Global
-    global heartbeatList, clientIDsList, serverId, socket, t
+    global heartbeatList, clientIDsList, serverId, updateStatus, socket, t
 
     # Unstoppable loop
     while True:
@@ -51,17 +51,23 @@ def protocol_Heartbeat():
             # Dead students
             for student in studentQueue:
                 if dead in student:
+                    # Update all clients
+                    updateStatus = True
                     ticketQueue.pop(studentQueue.index(student))
                     studentQueue.remove(student)
                     print('\tServer: Timeout for student client...\n')
             # Dead subscribers
             for sub in subsQueue:
                 if dead == subsQueue:
+                    # Update all clients
+                    updateStatus = True
                     subsQueue.remove(sub)
                     print('\tServer: Timeout for subscribed client...\n')
             # Dead supervisors
             for supervisor in supervisorList:
                 if dead in supervisor:
+                    # Update all clients
+                    updateStatus = True
                     supervisorList.remove(supervisor)
                     print('\tServer: Timeout for supervisor client...\n')
 
