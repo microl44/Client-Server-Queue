@@ -14,6 +14,12 @@ clientIDsList = []
 heartbeatList = []
 t = 15
 
+
+"""
+Kvar att genomföra: Supervisor har följande struktur (id, namn, status, eventuell ticket, meddelande). Det som behöver göras
+är att på något sätt flytta ut id från listan men fortfarande behålla så att man kan identifiera en supervisor
+"""
+
 def protocol_Heartbeat():
     # Global
     global heartbeatList, clientIDsList, serverId, updateStatus, socket, t
@@ -54,6 +60,8 @@ def protocol_Heartbeat():
                     # Update all clients
                     updateStatus = True
                     ticketQueue.pop(studentQueue.index(student))
+                    for ticket in ticketQueue:
+                        ticket['ticket'] = ticketQueue.index(ticket) + 1
                     studentQueue.remove(student)
                     print('\tServer: Timeout for student client...\n')
             # Dead subscribers
@@ -87,6 +95,7 @@ def protocol_Attend(client_id, message_dict):
             supervisorList.append([client_id, message_dict['name'], 'available', '', '']) 
             #Log
             print('\tServer: First supervisor added to class...\n')
+            print(supervisorList)
         else:
             match_id = False
             match_name = False
@@ -233,33 +242,49 @@ def protocol_Remove(client_id, message_dict):
             if len(studentQueue) == 1:
                 # Remove client from queue
                 message_student = studentQueue.pop(0)
-                ticketQueue.pop(0)
+                student_ticket = ticketQueue.pop(0)
                 updateStatus = True
-                # Construct message for response 
-                student_message = {'message': message_dict['message'], 'serverId': serverId}
-                message_response = json.dumps(student_message)
-                # Encode message
-                message_response = str.encode(message_response)
-                # Send response to student
-                msg = [message_student[0], message_response]
-                socket.send_multipart(msg)
+                # Find supervisor
+                for super in supervisorList:
+                    if client_id in super:
+                        # Update values for the supervisor
+                        super[2] = 'occupied'
+                        super[3] = student_ticket
+                        super[4] = message_dict['message']
+                        # Construct message for response 
+                        student_message = {'message': message_dict['message'], 'serverId': serverId}
+                        message_response = json.dumps(student_message)
+                        # Encode message
+                        message_response = str.encode(message_response)
+                        # Send response to student
+                        msg = [message_student[0], message_response]
+                        socket.send_multipart(msg)
+                        break
             # Check if more than one client in queue
             elif len(studentQueue) > 1:
                 # Remove client from queue
                 message_student = studentQueue.pop(0)
-                ticketQueue.pop(0)
+                student_ticket = ticketQueue.pop(0)
                 updateStatus = True
-                # Construct message for response 
-                student_message = {'message': message_dict['message'], 'serverId': serverId}
-                message_response = json.dumps(student_message)
-                # Encode message
-                message_response = str.encode(message_response)
-                # Send response to student
-                msg = [message_student[0], message_response]
-                socket.send_multipart(msg)
-                # Update remaining clients in queue
-                for ticket in ticketQueue:
-                    ticket['ticket'] = ticketQueue.index(ticket) + 1
+                # Find supervisor
+                for super in supervisorList:
+                    if client_id in super:
+                        # Update values for the supervisor
+                        super[2] = 'occupied'
+                        super[3] = student_ticket
+                        super[4] = message_dict['message']
+                        # Construct message for response 
+                        student_message = {'message': message_dict['message'], 'serverId': serverId}
+                        message_response = json.dumps(student_message)
+                        # Encode message
+                        message_response = str.encode(message_response)
+                        # Send response to student
+                        msg = [message_student[0], message_response]
+                        socket.send_multipart(msg)
+                        # Update remaining clients in queue
+                        for ticket in ticketQueue:
+                            ticket['ticket'] = ticketQueue.index(ticket) + 1
+                        break
         # Status update to log
         print('\t\t\tServer: Changes were made to student queue...')
     
@@ -270,24 +295,40 @@ def protocol_Remove(client_id, message_dict):
         elif studentQueue: 
             # Check if only one client in queue
             if len(studentQueue) == 1:
-                # Construct message for response 
-                student_message = {'message': message_dict['message'], 'serverId': serverId}
-                message_response = json.dumps(student_message)
-                # Encode message
-                message_response = str.encode(message_response)
-                # Send response to student
-                msg = [studentQueue[0][0], message_response]
-                socket.send_multipart(msg)
+                # Find supervisor
+                for super in supervisorList:
+                    if client_id in super:
+                        # Update values for the supervisor
+                        super[2] = 'occupied'
+                        super[3] = ''
+                        super[4] = ''
+                        # Construct message for response 
+                        student_message = {'message': message_dict['message'], 'serverId': serverId}
+                        message_response = json.dumps(student_message)
+                        # Encode message
+                        message_response = str.encode(message_response)
+                        # Send response to student
+                        msg = [studentQueue[0][0], message_response]
+                        socket.send_multipart(msg)
+                        break
             # Check if more than one client in queue
             elif len(studentQueue) > 1:
-                # Construct message for response 
-                student_message = {'message': message_dict['message'], 'serverId': serverId}
-                message_response = json.dumps(student_message)
-                # Encode message
-                message_response = str.encode(message_response)
-                # Send response to student
-                msg = [studentQueue[0][0], message_response]
-                socket.send_multipart(msg)
+                # Find supervisor
+                for super in supervisorList:
+                    if client_id in super:
+                        # Update values for the supervisor
+                        super[2] = 'occupied'
+                        super[3] = ''
+                        super[4] = ''
+                        # Construct message for response 
+                        student_message = {'message': message_dict['message'], 'serverId': serverId}
+                        message_response = json.dumps(student_message)
+                        # Encode message
+                        message_response = str.encode(message_response)
+                        # Send response to student
+                        msg = [studentQueue[0][0], message_response]
+                        socket.send_multipart(msg)
+                        break
         # Status update to log
         print('\t\t\tServer: Message sent to student...')
 
