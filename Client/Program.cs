@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -6,10 +6,9 @@ using System.Windows.Forms;
 using NetMQ;
 using NetMQ.Sockets;
 using System.Threading;
-using ClientGUI;
 
 
-namespace Client
+namespace SupervisorClient
 {
     static class Program
     {
