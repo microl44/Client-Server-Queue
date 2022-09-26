@@ -1,0 +1,7 @@
+bin
+bin/*
+obj
+obj/*
+Form1.resx
+SupervisorClient.csproj
+SupervisorClient.csproj.user
