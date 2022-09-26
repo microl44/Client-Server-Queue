@@ -12,7 +12,7 @@ supervisorList  = []
 ticketQueue = []
 clientIDsList = []
 heartbeatList = []
-t = 10
+t = 15
 
 def protocol_Heartbeat():
     # Global
@@ -53,14 +53,17 @@ def protocol_Heartbeat():
                 if dead in student:
                     ticketQueue.pop(studentQueue.index(student))
                     studentQueue.remove(student)
+                    print('\tServer: Timeout for student client...\n')
             # Dead subscribers
             for sub in subsQueue:
                 if dead == subsQueue:
                     subsQueue.remove(sub)
+                    print('\tServer: Timeout for subscribed client...\n')
             # Dead supervisors
             for supervisor in supervisorList:
                 if dead in supervisor:
                     supervisorList.remove(supervisor)
+                    print('\tServer: Timeout for supervisor client...\n')
 
         clientIDsList = aliveClients
         heartbeatList = []
@@ -282,7 +285,11 @@ def protocol_Remove(client_id, message_dict):
         # Status update to log
         print('\t\t\tServer: Message sent to student...')
 
-print('Server is starting...')
+print('Server is starting...\n')
+print('Please input an ID for the server: ')
+serverId = str(input())
+print('\nContinue with selecting time in seconds for client timeout: ')
+t = int(input())
 
 context = zmq.Context()
 socket = context.socket(zmq.ROUTER)
@@ -292,6 +299,8 @@ print('Configuring server... Please wait...')
 
 heartThread = threading.Thread(target=protocol_Heartbeat)
 heartThread.start()
+
+print('Server is upp and running...')
 
 while True:
     # Variable to tell if need exist to update all subscribed clients, false at start
@@ -323,8 +332,7 @@ while True:
         if clientID not in heartbeatList:
             heartbeatList.append(clientID)   
         protocol_Subscribe(clientID, messageDict)
-    
-    # If remove request is received
+
     if 'remove' in messageDict:
         if clientID not in heartbeatList:
             heartbeatList.append(clientID)   
@@ -348,13 +356,3 @@ while True:
             socket.send_multipart(msg)
         # Reset status
         updateStatus = False
-        
-    if '' == messageDict:
-        messageRes = {}
-        messageRes = json.dumps(messageRes)
-        messageRes = str.encode(messageRes)
-        temp = [clientID, messageRes]
-        # Send reply back to client
-        socket.send_multipart(temp)
-    # Do some work
-    time.sleep(1)
