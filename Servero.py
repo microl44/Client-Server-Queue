@@ -5,13 +5,65 @@ import time
 import json
 import threading
 
-
-global queueTickets
+serverId = '12345'
 subsQueue = []
 studentQueue = []
 supervisorList  = []
 ticketQueue = []
 clientIDsList = []
+heartbeatList = []
+t = 10
+
+def protocol_Heartbeat():
+    # Global
+    global heartbeatList, clientIDsList, serverId, socket, t
+
+    # Unstoppable loop
+    while True:
+        # Iterate through all clients and send a heartbeat message
+        for c in clientIDsList:
+            # Construct message
+            heartbeat = {'serverId': serverId}
+            heartbeat_message = json.dumps(heartbeat)
+            # Encode message
+            heartbeat_message = str.encode(heartbeat_message)
+            # Prepare final message
+            heartbeat_msg = [c, heartbeat_message]
+            # Send message
+            socket.send_multipart(heartbeat_msg)
+        
+        # Wait for T-seconds
+        time.sleep(t)
+
+        # Iterate through all heartbeat responses and trim all lists with clients
+        aliveClients = []
+        deadClients = []
+        for c in clientIDsList:
+            # Client responded to heartbeat or other message
+            if c in heartbeatList:
+                aliveClients.append(c)
+            # No response from client at all
+            elif c not in heartbeatList:
+                deadClients.append(c)
+        
+        # Check remaining list with clients due to timeout
+        for dead in deadClients:
+            # Dead students
+            for student in studentQueue:
+                if dead in student:
+                    ticketQueue.pop(studentQueue.index(student))
+                    studentQueue.remove(student)
+            # Dead subscribers
+            for sub in subsQueue:
+                if dead == subsQueue:
+                    subsQueue.remove(sub)
+            # Dead supervisors
+            for supervisor in supervisorList:
+                if dead in supervisor:
+                    supervisorList.remove(supervisor)
+
+        clientIDsList = aliveClients
+        heartbeatList = []
 
 def protocol_Attend(client_id, message_dict):
     # Global
@@ -66,7 +118,7 @@ def protocol_Attend(client_id, message_dict):
                         
 def protocol_EnterQueue(client_id, message_dict):
     # Global
-    global updateStatus, studentQueue, ticketQueue, socket
+    global updateStatus, studentQueue, ticketQueue, socket, serverId
     # Check if student client wants to enter queue
     if message_dict['enterQueue']:
         # If first student client to join
@@ -74,7 +126,7 @@ def protocol_EnterQueue(client_id, message_dict):
             # Add first student
             studentQueue.append([client_id, message_dict['name']])     
             # Construct message for response
-            ticketDict = {'ticket': 1, 'name': message_dict['name']}
+            ticketDict = {'ticket': 1, 'name': message_dict['name'], 'serverId': serverId}
             ticketQueue.append(ticketDict)
             message_response = json.dumps(ticketDict)
             # Encode message
@@ -113,7 +165,7 @@ def protocol_EnterQueue(client_id, message_dict):
                 # Add student client to list
                 studentQueue.append([client_id, message_dict['name']])
                 # Construct ticket for student
-                ticket = {'ticket': len(studentQueue), 'name': message_dict['name']}
+                ticket = {'ticket': len(studentQueue), 'name': message_dict['name'], 'serverId': serverId}
                 ticketQueue.append(ticket)
                 # Construct message for response 
                 message_response = json.dumps(ticket)
@@ -138,14 +190,14 @@ def protocol_Subscribe(client_id, message_dict):
             print('\t\tServer: Client is already subscribed...\n')
             
         # Construct message for response
-        status_dict = {'queue' : ticketQueue}
+        status_dict = {'queue' : ticketQueue, 'supervisors': supervisorList, 'serverId': serverId}
         message_response = json.dumps(status_dict)
         # Encode message
         message_response = str.encode(message_response)
         msg = [client_id, message_response]
         # Send response to client
         socket.send_multipart(msg)
-    
+
     elif not message_dict['subscribe']:
         # Remove client from list as long as list is not empty
         if subsQueue:
@@ -157,11 +209,11 @@ def protocol_Subscribe(client_id, message_dict):
             else:
                 print('\t\tServer: Client not found in queue...\n')
 
-    print('\t\tServer: Subscriptions has been updated, new total is' + len(subsQueue) + '\n')
+    print('\t\tServer: Subscriptions has been updated, new total is ' + str(len(subsQueue)) + '\n')
 
 def protocol_Remove(client_id, message_dict):
     # Global
-    global ticketQueue, studentQueue, updateStatus
+    global ticketQueue, studentQueue, updateStatus, serverId
     # Check if goal is to remove student
     if message_dict['remove']:
         # Check if queue is empty
@@ -171,21 +223,65 @@ def protocol_Remove(client_id, message_dict):
             # Check if only one client in queue
             if len(studentQueue) == 1:
                 # Remove client from queue
-                studentQueue.pop(0)
+                message_student = studentQueue.pop(0)
                 ticketQueue.pop(0)
                 updateStatus = True
+                # Construct message for response 
+                student_message = {'message': message_dict['message'], 'serverId': serverId}
+                message_response = json.dumps(student_message)
+                # Encode message
+                message_response = str.encode(message_response)
+                # Send response to student
+                msg = [message_student[0], message_response]
+                socket.send_multipart(msg)
             # Check if more than one client in queue
             elif len(studentQueue) > 1:
                 # Remove client from queue
-                studentQueue.pop(0)
+                message_student = studentQueue.pop(0)
                 ticketQueue.pop(0)
                 updateStatus = True
+                # Construct message for response 
+                student_message = {'message': message_dict['message'], 'serverId': serverId}
+                message_response = json.dumps(student_message)
+                # Encode message
+                message_response = str.encode(message_response)
+                # Send response to student
+                msg = [message_student[0], message_response]
+                socket.send_multipart(msg)
                 # Update remaining clients in queue
                 for ticket in ticketQueue:
-                    ticket['ticket'] = ticketQueue.index(ticket)
+                    ticket['ticket'] = ticketQueue.index(ticket) + 1
         # Status update to log
-        print('\t\t\tServer: Changes were made to queue...')
+        print('\t\t\tServer: Changes were made to student queue...')
     
+    elif not message_dict['remove']:
+        # Check if queue is empty
+        if not studentQueue:
+            ('\t\t\tServer: Failed to send message... Queue is empty...')
+        elif studentQueue: 
+            # Check if only one client in queue
+            if len(studentQueue) == 1:
+                # Construct message for response 
+                student_message = {'message': message_dict['message'], 'serverId': serverId}
+                message_response = json.dumps(student_message)
+                # Encode message
+                message_response = str.encode(message_response)
+                # Send response to student
+                msg = [studentQueue[0][0], message_response]
+                socket.send_multipart(msg)
+            # Check if more than one client in queue
+            elif len(studentQueue) > 1:
+                # Construct message for response 
+                student_message = {'message': message_dict['message'], 'serverId': serverId}
+                message_response = json.dumps(student_message)
+                # Encode message
+                message_response = str.encode(message_response)
+                # Send response to student
+                msg = [studentQueue[0][0], message_response]
+                socket.send_multipart(msg)
+        # Status update to log
+        print('\t\t\tServer: Message sent to student...')
+
 print('Server is starting...')
 
 context = zmq.Context()
@@ -193,6 +289,9 @@ socket = context.socket(zmq.ROUTER)
 socket.bind('tcp://*:5555')
 
 print('Configuring server... Please wait...')
+
+heartThread = threading.Thread(target=protocol_Heartbeat)
+heartThread.start()
 
 while True:
     # Variable to tell if need exist to update all subscribed clients, false at start
@@ -211,28 +310,41 @@ while True:
     messageDict = json.loads(message)
     
     if 'attend' in messageDict:
+        if clientID not in heartbeatList:
+            heartbeatList.append(clientID)   
         protocol_Attend(clientID, messageDict)
         
     if 'enterQueue' in messageDict:
+        if clientID not in heartbeatList:
+            heartbeatList.append(clientID)   
         protocol_EnterQueue(clientID, messageDict)
 
     if 'subscribe' in messageDict:
+        if clientID not in heartbeatList:
+            heartbeatList.append(clientID)   
         protocol_Subscribe(clientID, messageDict)
     
     # If remove request is received
     if 'remove' in messageDict:
+        if clientID not in heartbeatList:
+            heartbeatList.append(clientID)   
         protocol_Remove(clientID, messageDict)
         
-                    
+    if not messageDict:
+        if clientID not in heartbeatList:
+            heartbeatList.append(clientID) 
+
     # If queue has been updated            
     if updateStatus:
-        # For every client in the subscribed list
+        # Prepare general message
+        status_message = {'queue' : ticketQueue, 'supervisors': supervisorList, 'serverId': serverId}
+        # Construct message
+        message_response = json.dumps(status_message)
+        # Encode message
+        message_response = str.encode(message_response)
+        # Send status update to subscribed clients
         for c in subsQueue:
-            # Prepare and send message to client
-            statusDict = {'queue' : queueTickets}
-            messageRes = json.dumps(statusDict)
-            messageRes = str.encode(messageRes)
-            msg = [clientID, messageRes]
+            msg = [c, message_response]
             socket.send_multipart(msg)
         # Reset status
         updateStatus = False
