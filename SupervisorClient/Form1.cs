@@ -39,6 +39,7 @@ namespace SupervisorClient
         {
             InitializeComponent();
             Connecter.socket = new DealerSocket();
+            Connecter.socket1 = new DealerSocket();
             Connecter.messageToSend = new NetMQMessage();
             Connecter.messageToRecieve = new NetMQMessage();
             Connecter.asyncSocket = new NetMQRuntime();
@@ -58,6 +59,7 @@ namespace SupervisorClient
         public class Connecter
         {
             public static DealerSocket socket;
+            public static DealerSocket socket1;
             public static NetMQMessage messageToSend;
             public static NetMQMessage messageToRecieve;
             public static NetMQRuntime asyncSocket;
@@ -71,73 +73,99 @@ namespace SupervisorClient
         {
             while (true)
             {
-                try
+                var poller = new NetMQPoller { Connecter.socket, Connecter.socket1 };
                 {
-                    
-                    // Recieve multipart message, encode and store into variable, parse message to json object.
-                    Connecter.messageToRecieve = Connecter.socket.ReceiveMultipartMessage();
-                    var content = Encoding.UTF8.GetString(Connecter.messageToRecieve[0].Buffer);
-                    System.Diagnostics.Debug.WriteLine(content);
-                    JObject jsonContent = JObject.Parse(content);
-
-                    //System.Diagnostics.Debug.WriteLine(jsonContent.ToString());
-                    //if it's the first message and contains only serverId, it means some heartbeat got missdirected. Ignore it and listen for new message.
-                    if (firstMessage == true && jsonContent.Count == 1 && jsonContent.ContainsKey("serverId"))
-{
-                        firstMessage = false;
-                        continue;
-                    }
-
-                    if (firstMessage == false && jsonContent.Count == 1 && jsonContent.ContainsKey("serverId"))
+                    Connecter.socket.ReceiveReady += (s, a) =>
                     {
-                        string heartbeat = "{}";
-                        SendMessage(heartbeat);
-                        System.Diagnostics.Debug.WriteLine("heartbeat recieved and sent");
-                        continue;
-                    }
+                        // Recieve multipart message, encode and store into variable, parse message to json object.
+                        System.Diagnostics.Debug.WriteLine("Fuck you from socket protocol 1");
+                        Connecter.messageToRecieve = Connecter.socket.ReceiveMultipartMessage();
 
-                    // if message is ticket response, add serverId to list of servers and update the users current place.
-                    if (jsonContent.ContainsKey("ticket") && jsonContent.ContainsKey("name") && jsonContent.ContainsKey("serverId"))
+                        var content = Encoding.UTF8.GetString(Connecter.messageToRecieve[0].Buffer);
+                        System.Diagnostics.Debug.WriteLine(content);
+                        JObject jsonContent = JObject.Parse(content);
+
+                        HandleMessage(jsonContent);
+                    };
+                    Connecter.socket1.ReceiveReady += (s, a) =>
                     {
-                        if(firstMessage)
-                        {
-                            serverList.Remove("temp");
-                        }
-                        if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
-                        {
-                            serverList.Add(jsonContent.GetValue("serverId").ToString());
-                        }
+                        // Recieve multipart message, encode and store into variable, parse message to json object.
+                        System.Diagnostics.Debug.WriteLine("Fuck you from socket protocol 1");
+                        Connecter.messageToRecieve = Connecter.socket1.ReceiveMultipartMessage();
 
-                        firstMessage = false;
-                        Connecter.currentPlace = jsonContent.GetValue("ticket").ToString();
-                    }
-                    else if (jsonContent.ContainsKey("queue") && jsonContent.ContainsKey("supervisors") && jsonContent.ContainsKey("serverId"))
-                    {
-                        if (firstMessage)
-                        {
-                            serverList.Remove("temp");
-                        }
-                        if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
-                        {
-                            serverList.Add(jsonContent.GetValue("serverId").ToString());
-                        }
+                        var content = Encoding.UTF8.GetString(Connecter.messageToRecieve[0].Buffer);
+                        System.Diagnostics.Debug.WriteLine(content);
+                        JObject jsonContent = JObject.Parse(content);
 
-                        firstMessage = false;
+                        HandleMessage(jsonContent);
+                    };
+                };
+                poller.Run();
+            };
+        }
 
-                        extractQueue(jsonContent, "student");
-                        extractQueue(jsonContent, "supervisor");
-                    }
-                }
-                catch(Exception e)
+        public void HandleMessage(JObject jsonContent)
+        {
+            try
+            {
+                //System.Diagnostics.Debug.WriteLine(jsonContent.ToString());
+                //if it's the first message and contains only serverId, it means some heartbeat got missdirected. Ignore it and listen for new message.
+                if (firstMessage == true && jsonContent.Count == 1 && jsonContent.ContainsKey("serverId"))
                 {
-                    System.Diagnostics.Debug.WriteLine(e.Message);
-                    continue;
+                    firstMessage = false;
+                    return;
                 }
+
+                if (firstMessage == false && jsonContent.Count == 1 && jsonContent.ContainsKey("serverId"))
+                {
+                    string heartbeat = "{}";
+                    SendMessage(heartbeat);
+                    System.Diagnostics.Debug.WriteLine("heartbeat recieved and sent");
+                    return;
+                }
+
+                // if message is ticket response, add serverId to list of servers and update the users current place.
+                if (jsonContent.ContainsKey("ticket") && jsonContent.ContainsKey("name") && jsonContent.ContainsKey("serverId"))
+                {
+                    if (firstMessage)
+                    {
+                        serverList.Remove("temp");
+                    }
+                    if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
+                    {
+                        serverList.Add(jsonContent.GetValue("serverId").ToString());
+                    }
+
+                    firstMessage = false;
+                    Connecter.currentPlace = jsonContent.GetValue("ticket").ToString();
+                }
+                else if (jsonContent.ContainsKey("queue") && jsonContent.ContainsKey("supervisors") && jsonContent.ContainsKey("serverId"))
+                {
+                    if (firstMessage)
+                    {
+                        serverList.Remove("temp");
+                    }
+                    if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
+                    {
+                        serverList.Add(jsonContent.GetValue("serverId").ToString());
+                    }
+
+                    firstMessage = false;
+
+                    extractQueue(jsonContent, "student");
+                    extractQueue(jsonContent, "supervisor");
+                }
+            }
+            catch (Exception e)
+            {
+                System.Diagnostics.Debug.WriteLine(e.Message);
+                return;
             }
         }
         public void SendMessage(string MessageToSend)
         {
             Connecter.socket.SendFrame(MessageToSend);
+            Connecter.socket1.SendFrame(MessageToSend);
         }
 
         public void ThrowError()
@@ -189,6 +217,8 @@ namespace SupervisorClient
                 }
 
                 Connecter.socket.Connect("tcp://" + ip + ":" + port);
+                Connecter.socket1.Connect("tcp://" + ip + ":" + "5556");
+                System.Diagnostics.Debug.WriteLine("connected to both");
                 isConnected = true;
 
                 return true;
