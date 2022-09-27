@@ -13,6 +13,7 @@ using System.Threading;
 using System.Text.Json;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Timers;
 
 namespace Client
 {
@@ -33,7 +34,7 @@ namespace Client
         private static bool isInQueue = false;
         private static bool firstMessage = true;
 
-        System.Timers.Timer timer = new System.Timers.Timer();
+        System.Timers.Timer timer = new System.Timers.Timer(10000);
         public Form1()
         {
             InitializeComponent();
@@ -46,6 +47,8 @@ namespace Client
             TBStudentQueue.ShortcutsEnabled = false;
 
             serverList.Add("temp");
+
+            timer.Elapsed += OnTimedEvent;
 
             Thread doSomething = new Thread(() => ThreadWork());
             doSomething.Start();
@@ -66,6 +69,11 @@ namespace Client
 
         }
 
+        private static void OnTimedEvent(Object source, ElapsedEventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine("You're out!");
+        }
+
         public void ThreadWork()
         {
             while (true)
@@ -75,7 +83,6 @@ namespace Client
                     Connecter.socket.ReceiveReady += (s, a) =>
                     {
                         // Recieve multipart message, encode and store into variable, parse message to json object.
-                        System.Diagnostics.Debug.WriteLine("Fuck you from socket protocol 1");
                         Connecter.messageToRecieve = Connecter.socket.ReceiveMultipartMessage();
 
                         var content = Encoding.UTF8.GetString(Connecter.messageToRecieve[0].Buffer);
@@ -124,6 +131,7 @@ namespace Client
             {
                 if (firstMessage)
                 {
+                    timer.Start();
                     serverList.Remove("temp");
                 }
                 if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
@@ -138,6 +146,7 @@ namespace Client
             {
                 if (firstMessage)
                 {
+                    timer.Start();
                     serverList.Remove("temp");
                 }
                 if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
@@ -329,11 +338,9 @@ namespace Client
         {
             if (FetchInfo())
             {
-                foreach (string x in serverList)
-                {
-                    string enterQueueTicket = "{\"enterQueue\":true,\"name\":\"" + username + "\"}";
-                    SendMessage(enterQueueTicket);
-                }
+                timer.Start();
+                string enterQueueTicket = "{\"enterQueue\":true,\"name\":\"" + username + "\"}";
+                SendMessage(enterQueueTicket);
             }
         }
 
@@ -341,12 +348,10 @@ namespace Client
         {
             if (FetchInfo())
             {
-                foreach (string x in serverList)
-                {
-                    string subscribeToQueue = "{\"subscribe\":true}";
-                    SendMessage(subscribeToQueue);
-                    isInQueue = true;
-                }
+                timer.Start();
+                string subscribeToQueue = "{\"subscribe\":true}";
+                SendMessage(subscribeToQueue);
+                isInQueue = true;
             }
         }
 
@@ -354,13 +359,11 @@ namespace Client
         {
             if (isConnected)
             {
-                foreach(string x in serverList)
-                {
-                    string RemovesubscribeToQueue = "{\"subscribe\":false}";
-                    SendMessage(RemovesubscribeToQueue);
-                    clearTextBox();
-                    isInQueue = false;
-                }
+                timer.Start();
+                string RemovesubscribeToQueue = "{\"subscribe\":false}";
+                SendMessage(RemovesubscribeToQueue);
+                clearTextBox();
+                isInQueue = false;
             }
         }
     }
