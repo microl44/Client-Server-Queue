@@ -33,13 +33,14 @@ namespace Client
         private static bool isInQueue = false;
         private static bool firstMessage = true;
 
+        System.Timers.Timer timer = new System.Timers.Timer();
         public Form1()
         {
             InitializeComponent();
             Connecter.socket = new DealerSocket();
+            Connecter.socket2 = new DealerSocket();
             Connecter.messageToSend = new NetMQMessage();
             Connecter.messageToRecieve = new NetMQMessage();
-            Connecter.asyncSocket = new NetMQRuntime();
 
             TBStudentQueue.ReadOnly = true;
             TBStudentQueue.ShortcutsEnabled = false;
@@ -56,24 +57,38 @@ namespace Client
         public class Connecter
         {
             public static DealerSocket socket;
+            public static DealerSocket socket2;
             public static NetMQMessage messageToSend;
             public static NetMQMessage messageToRecieve;
-            public static NetMQRuntime asyncSocket;
-            public static System.Timers.Timer timer = new System.Timers.Timer(interval: 5000);
 
             public static string currentPlace;
             public static string textBoxText;
+
+        }
+
+        public NetMQMessage FetchMQMessage()
+        {
+            while(true)
+            {
+                if (Connecter.socket.HasIn)
+                {
+                    return Connecter.socket.ReceiveMultipartMessage();
+                }
+                else if (Connecter.socket2.HasIn)
+                {
+                    return Connecter.socket.ReceiveMultipartMessage();
+                }
+            }
         }
 
         public void ThreadWork()
         {
-
             while (true)
             {
                 try
                 {
                     // Recieve multipart message, encode and store into variable, parse message to json object.
-                    Connecter.messageToRecieve = Connecter.socket.ReceiveMultipartMessage();
+                    Connecter.messageToRecieve = FetchMQMessage();
                     var content = Encoding.UTF8.GetString(Connecter.messageToRecieve[0].Buffer);
                     System.Diagnostics.Debug.WriteLine(content);
                     JObject jsonContent = JObject.Parse(content);
@@ -101,12 +116,15 @@ namespace Client
                         serverList.Remove("temp");
                         if (firstMessage)
                         {
-                            if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
-                            {
-                                serverList.Add(jsonContent.GetValue("serverId").ToString());
-                            }
+                            serverList.Remove("temp");
                             firstMessage = false;
                         }
+                        if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
+                        {
+                            serverList.Add(jsonContent.GetValue("serverId").ToString());
+                        }
+
+                        firstMessage = false;
                         Connecter.currentPlace = jsonContent.GetValue("ticket").ToString();
                     }
                     else if (jsonContent.ContainsKey("queue") && jsonContent.ContainsKey("supervisors") && jsonContent.ContainsKey("serverId"))
@@ -114,13 +132,14 @@ namespace Client
                         serverList.Remove("temp");
                         if (firstMessage)
                         {
-
-                            if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
-                            {
-                                serverList.Add(jsonContent.GetValue("serverId").ToString());
-                            }
+                            serverList.Remove("temp");
                             firstMessage = false;
                         }
+                        if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
+                        {
+                            serverList.Add(jsonContent.GetValue("serverId").ToString());
+                        }
+
                         extractQueue(jsonContent, "student");
                         extractQueue(jsonContent, "supervisor");
                     }
@@ -139,6 +158,7 @@ namespace Client
         public void SendMessage(string MessageToSend)
         {
             Connecter.socket.SendFrame(MessageToSend);
+            Connecter.socket2.SendFrame(MessageToSend);
         }
 
         public void ShowMessage(string windowTitle, string message)
@@ -185,6 +205,7 @@ namespace Client
                 }
 
                 Connecter.socket.Connect("tcp://" + ip + ":" + port);
+                Connecter.socket2.Connect("tcp://" + ip + ":" + (Int64.Parse(port) + 1).ToString());
                 isConnected = true;
 
                 return true;
@@ -272,6 +293,14 @@ namespace Client
                 }
             }
         }
+
+        public void ConnectionTimeOut()
+        {
+            while(true)
+            {
+
+            }
+        }
         public void UpdateQueueGUI()
         {
             Thread.Sleep(1000);
@@ -299,8 +328,11 @@ namespace Client
         {
             if (FetchInfo())
             {
-                string enterQueueTicket = "{\"enterQueue\":true,\"name\":\"" + username + "\"}";
-                SendMessage(enterQueueTicket);
+                foreach (string x in serverList)
+                {
+                    string enterQueueTicket = "{\"enterQueue\":true,\"name\":\"" + username + "\"}";
+                    SendMessage(enterQueueTicket);
+                }
             }
         }
 
@@ -308,9 +340,12 @@ namespace Client
         {
             if (FetchInfo())
             {
-                string subscribeToQueue = "{\"subscribe\":true}";
-                SendMessage(subscribeToQueue);
-                isInQueue = true;
+                foreach (string x in serverList)
+                {
+                    string subscribeToQueue = "{\"subscribe\":true}";
+                    SendMessage(subscribeToQueue);
+                    isInQueue = true;
+                }
             }
         }
 
@@ -318,10 +353,13 @@ namespace Client
         {
             if (isConnected)
             {
-                string RemovesubscribeToQueue = "{\"subscribe\":false}";
-                SendMessage(RemovesubscribeToQueue);
-                clearTextBox();
-                isInQueue = false;
+                foreach(string x in serverList)
+                {
+                    string RemovesubscribeToQueue = "{\"subscribe\":false}";
+                    SendMessage(RemovesubscribeToQueue);
+                    clearTextBox();
+                    isInQueue = false;
+                }
             }
         }
     }
