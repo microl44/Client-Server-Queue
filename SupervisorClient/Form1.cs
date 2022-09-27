@@ -242,7 +242,7 @@ namespace SupervisorClient
                     supervisorList.Add(x["name"].ToString() + " ");
                     supervisorList.Add(x["status"].ToString() + " ");
                     supervisorList.Add(x["client"].ToString() + " ");
-                    supervisorList.Add(x["clientMessage"].ToString() + " \n ");
+                    //supervisorList.Add(x["clientMessage"].ToString() + " \n ");
                 }
 
                 foreach (var x in supervisorList)
@@ -319,7 +319,7 @@ namespace SupervisorClient
                 foreach (string server in serverList)
                 {
                     string message = richTextBoxMessageToSend.Text;
-                    string enterQueueTicket = "{\"remove\":false,\"name:\"" + username + "\", message\":\"" + message + "\"}";
+                    string enterQueueTicket = "{\"remove\":true,\"name\":\"" + username + "\", \"message\":\"" + message + "\"}";
                     SendMessage(enterQueueTicket);
                 }
             }
@@ -330,7 +330,7 @@ namespace SupervisorClient
             if (CreateConnection())
             {
                 string message = richTextBoxMessageToSend.Text;
-                string enterQueueTicket = "{\"remove\":false,\"name:\"" + username + "\", message\":\"" + message + "\"}";
+                string enterQueueTicket = "{\"remove\":false,\"name\":\"" + username + "\", \"message\":\"" + message + "\"}";
                 SendMessage(enterQueueTicket);
             }
         }

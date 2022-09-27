@@ -120,10 +120,10 @@ namespace Client
                         extractQueue(jsonContent, "student");
                         extractQueue(jsonContent, "supervisor");
                     }
-                    else if (firstMessage == false && jsonContent.ContainsKey("name") && jsonContent.ContainsKey("message") && jsonContent.ContainsKey("serverId"))
+                    else if (jsonContent.ContainsKey("name") && jsonContent.ContainsKey("message") && jsonContent.ContainsKey("serverId"))
                     {
                         System.Diagnostics.Debug.WriteLine("Message from admin recieved!");
-                        ShowMessage("Message from Supervisor", jsonContent.GetValue("message").ToString());
+                        ShowMessage("Message from Supervisor", jsonContent.GetValue("clientMessage").ToString());
                     }
                 }
                 catch (Exception e)

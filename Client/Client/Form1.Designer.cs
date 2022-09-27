@@ -169,7 +169,7 @@
             this.Controls.Add(this.button1);
             this.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
             this.Name = "Form1";
-            this.Text = "Form1";
+            this.Text = "Student Client";
             this.ResumeLayout(false);
             this.PerformLayout();
 
