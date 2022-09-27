@@ -82,13 +82,13 @@ def protocol_Attend(message_dict):
         if not supervisorList:
             updateStatus = True
             # Add supervisor client to list
-            supervisorList.append([message_dict['name'], 'available', '', '']) 
+            supervisorList.append({'name':message_dict['name'], 'status':'available', 'client':'', 'clientMessage':''}) 
             print('\tServer: First supervisor added to class...\n')
         else:
             match_name = False
             # Check if supervisor client is already in class with same name
             for supervisor in supervisorList:
-                if message_dict['name'] in supervisor:
+                if message_dict['name'] in supervisor['name']:
                     updateStatus = False
                     match_name = True
                     print('\tServer: A supervisor with that name is already attending class...\n')
@@ -96,7 +96,7 @@ def protocol_Attend(message_dict):
             if not match_name:
                 updateStatus = True
                 # Add supervisor client to list
-                supervisorList.append([message_dict['name'], 'available', '', ''])
+                supervisorList.append({'name':message_dict['name'], 'status':'available', 'client':'', 'clientMessage':''})
                 print('\tServer: Supervisor is added to class...\n')  
          
     elif not message_dict['attend']:
@@ -106,7 +106,7 @@ def protocol_Attend(message_dict):
         else:
             # Find supervisor in list and remove
             for supervisor in supervisorList:
-                if message_dict['name'] in supervisor:
+                if message_dict['name'] in supervisor['name']:
                     updateStatus = True
                     # Remove  supervisor
                     supervisorList.pop(supervisorList.index(supervisor))
@@ -221,11 +221,11 @@ def protocol_Remove(message_dict):
                 updateStatus = True
                 # Find supervisor
                 for super in supervisorList:
-                    if message_dict['name'] in super:
+                    if message_dict['name'] in super['name']:
                         # Update values for the supervisor
-                        super[1] = 'occupied'
-                        super[2] = student_ticket
-                        super[3] = message_dict['message']
+                        super['status'] = 'occupied'
+                        super['client'] = student_ticket
+                        super['clientMessage'] = message_dict['message']
                         # Construct message for response 
                         student_message = {'name': message_dict['name'], 'message': message_dict['message'], 'serverId': serverId}
                         message_response = json.dumps(student_message)
@@ -243,11 +243,11 @@ def protocol_Remove(message_dict):
                 updateStatus = True
                 # Find supervisor
                 for super in supervisorList:
-                    if message_dict['name'] in super:
+                    if message_dict['name'] in super['name']:
                         # Update values for the supervisor
-                        super[1] = 'occupied'
-                        super[2] = student_ticket
-                        super[3] = message_dict['message']
+                        super['status'] = 'occupied'
+                        super['client'] = student_ticket
+                        super['clientMessage'] = message_dict['message']
                         # Construct message for response 
                         student_message = {'name': message_dict['name'], 'message': message_dict['message'], 'serverId': serverId}
                         message_response = json.dumps(student_message)
@@ -271,11 +271,11 @@ def protocol_Remove(message_dict):
             if len(studentQueue) == 1:
                 # Find supervisor
                 for super in supervisorList:
-                    if message_dict['name'] in super:
+                    if message_dict['name'] in super['name']:
                         # Update values for the supervisor
-                        super[1] = 'occupied'
-                        super[2] = ''
-                        super[3] = ''
+                        super['status'] = 'occupied'
+                        super['client'] = ''
+                        super['clientMessage'] = ''
                         # Construct message for response 
                         student_message = {'message': message_dict['message'], 'serverId': serverId}
                         message_response = json.dumps(student_message)
@@ -289,11 +289,11 @@ def protocol_Remove(message_dict):
             elif len(studentQueue) > 1:
                 # Find supervisor
                 for super in supervisorList:
-                    if message_dict[''] in super:
+                    if message_dict['name'] in super['name']:
                         # Update values for the supervisor
-                        super[1] = 'occupied'
-                        super[2] = ''
-                        super[3] = ''
+                        super['name'] = 'occupied'
+                        super['client'] = ''
+                        super['clientMessage'] = ''
                         # Construct message for response 
                         student_message = {'message': message_dict['message'], 'serverId': serverId}
                         message_response = json.dumps(student_message)
