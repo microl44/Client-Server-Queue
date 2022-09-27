@@ -5,18 +5,20 @@ import time
 import json
 import threading
 
-serverId = '12345'
 subsQueue = []
 studentQueue = []
+supervisorIDs = []
 supervisorList  = []
 ticketQueue = []
 clientIDsList = []
 heartbeatList = []
+serverId = '1'
 t = 15
+port = 5555
 
 def protocol_Heartbeat():
     # Global
-    global heartbeatList, clientIDsList, serverId, updateStatus, socket, t
+    global heartbeatList, clientIDsList, supervisorIDs, serverId, updateStatus, socket, t
     # Unstoppable loop
     while True:
         # Iterate through all clients and send a heartbeat message
@@ -42,7 +44,6 @@ def protocol_Heartbeat():
             # No response from client at all
             elif c not in heartbeatList:
                 deadClients.append(c)
-        
         # Check remaining list with clients due to timeout
         for dead in deadClients:
             # Dead students
@@ -57,22 +58,26 @@ def protocol_Heartbeat():
                     print('\tServer: Timeout for student client...\n')
             # Dead subscribers
             for sub in subsQueue:
-                if dead == subsQueue:
+                if dead in subsQueue:
                     # Update all clients
                     updateStatus = True
                     subsQueue.remove(sub)
                     print('\tServer: Timeout for subscribed client...\n')
             # Dead supervisors
-            for supervisor in supervisorList:
+            for supervisor in supervisorIDs:
                 if dead in supervisor:
-                    updateStatus = True
-                    supervisorList.remove(supervisor)
-                    print('\tServer: Timeout for supervisor client...\n')
+                    # Find correct name on supervisor with dead ID
+                    for super in supervisorList:
+                        if supervisor[1] == super['name']:
+                            updateStatus = True
+                            supervisorList.remove(super)
+                            supervisorIDs.remove(supervisor)
+                            print('\tServer: Timeout for supervisor client...\n')
 
         clientIDsList = aliveClients
         heartbeatList = []
 
-def protocol_Attend(message_dict):
+def protocol_Attend(client_id, message_dict):
     # Global
     global updateStatus, supervisorList
     # Check if supervisor client wants to join class
@@ -81,13 +86,14 @@ def protocol_Attend(message_dict):
         if not supervisorList:
             updateStatus = True
             # Add supervisor client to list
-            supervisorList.append([message_dict['name'], 'available', '', '']) 
+            supervisorList.append({'name':message_dict['name'], 'status':'available', 'client':'', 'clientMessage':''}) 
+            supervisorIDs.append([client_id, message_dict['name']])
             print('\tServer: First supervisor added to class...\n')
         else:
             match_name = False
             # Check if supervisor client is already in class with same name
             for supervisor in supervisorList:
-                if message_dict['name'] in supervisor:
+                if message_dict['name'] in supervisor['name']:
                     updateStatus = False
                     match_name = True
                     print('\tServer: A supervisor with that name is already attending class...\n')
@@ -95,20 +101,22 @@ def protocol_Attend(message_dict):
             if not match_name:
                 updateStatus = True
                 # Add supervisor client to list
-                supervisorList.append([message_dict['name'], 'available', '', ''])
+                supervisorList.append({'name':message_dict['name'], 'status':'available', 'client':'', 'clientMessage':''})
+                supervisorIDs.append([client_id, message_dict['name']])
                 print('\tServer: Supervisor is added to class...\n')  
          
     elif not message_dict['attend']:
-        # If no supervisor
+        # If no supervisors
         if not supervisorList:
             print('\tServer: No supervisor attending class...\n')
         else:
             # Find supervisor in list and remove
             for supervisor in supervisorList:
-                if message_dict['name'] in supervisor:
+                if message_dict['name'] in supervisor['name']:
                     updateStatus = True
                     # Remove  supervisor
                     supervisorList.pop(supervisorList.index(supervisor))
+                    supervisorIDs.pop(supervisorList.index(supervisor))
                     print('\tServer: A supervisor has left class...\n')
                         
 def protocol_EnterQueue(client_id, message_dict):
@@ -121,9 +129,10 @@ def protocol_EnterQueue(client_id, message_dict):
             # Add first student
             studentQueue.append([client_id, message_dict['name']])     
             # Construct message for response
-            ticketDict = {'ticket': 1, 'name': message_dict['name'], 'serverId': serverId}
+            ticketDict = {'ticket': 1, 'name': message_dict['name']}
+            message_ticket = {'ticket': 1, 'name': message_dict['name'], 'serverId': serverId}
             ticketQueue.append(ticketDict)
-            message_response = json.dumps(ticketDict)
+            message_response = json.dumps(message_ticket)
             # Encode message
             message_response = str.encode(message_response)
             # Send response to student
@@ -143,6 +152,7 @@ def protocol_EnterQueue(client_id, message_dict):
                         # Get the student's ticket and resend if name matches
                         student_ticket = ticketQueue[studentQueue.index(student)]
                         if student_ticket['name'] in student:
+                            student_ticket['serverId'] = serverId
                             # Construct message for response
                             message_response = json.dumps(student_ticket)
                             # Encode message
@@ -157,10 +167,11 @@ def protocol_EnterQueue(client_id, message_dict):
                 # Add student client to list
                 studentQueue.append([client_id, message_dict['name']])
                 # Construct ticket for student
-                ticket = {'ticket': len(studentQueue), 'name': message_dict['name'], 'serverId': serverId}
+                ticket = {'ticket': len(studentQueue), 'name': message_dict['name']}
+                message_ticket = {'ticket': len(studentQueue), 'name': message_dict['name'], 'serverId': serverId}
                 ticketQueue.append(ticket)
                 # Construct message for response 
-                message_response = json.dumps(ticket)
+                message_response = json.dumps(message_ticket)
                 # Encode message
                 message_response = str.encode(message_response)
                 # Send response to student
@@ -177,7 +188,6 @@ def protocol_Subscribe(client_id, message_dict):
         if client_id not in subsQueue:
             subsQueue.append(client_id)
             print('\t\tServer: Client successfully subscribed...\n')
-        
         else:
             print('\t\tServer: Client is already subscribed...\n')
             
@@ -197,13 +207,11 @@ def protocol_Subscribe(client_id, message_dict):
             if client_id in subsQueue:
                 subsQueue.pop(subsQueue.index(client_id))
                 print('\t\tServer: Client has been unsubscribed...\n')
-            
             else:
                 print('\t\tServer: Client not found in queue...\n')
-
     print('\t\tServer: Subscriptions has been updated, new total is ' + str(len(subsQueue)) + '\n')
 
-def protocol_Remove(client_id, message_dict):
+def protocol_Remove(message_dict):
     # Global
     global ticketQueue, studentQueue, updateStatus, serverId
     # Check if goal is to remove student
@@ -220,13 +228,13 @@ def protocol_Remove(client_id, message_dict):
                 updateStatus = True
                 # Find supervisor
                 for super in supervisorList:
-                    if message_dict['name'] in super:
+                    if message_dict['name'] in super['name']:
                         # Update values for the supervisor
-                        super[1] = 'occupied'
-                        super[2] = student_ticket
-                        super[3] = message_dict['message']
+                        super['status'] = 'occupied'
+                        super['client'] = student_ticket
+                        super['clientMessage'] = message_dict['message']
                         # Construct message for response 
-                        student_message = {'message': message_dict['message'], 'serverId': serverId}
+                        student_message = {'name': message_dict['name'], 'message': message_dict['message'], 'serverId': serverId}
                         message_response = json.dumps(student_message)
                         # Encode message
                         message_response = str.encode(message_response)
@@ -242,20 +250,20 @@ def protocol_Remove(client_id, message_dict):
                 updateStatus = True
                 # Find supervisor
                 for super in supervisorList:
-                    if message_dict['name'] in super:
+                    if message_dict['name'] in super['name']:
                         # Update values for the supervisor
-                        super[1] = 'occupied'
-                        super[2] = student_ticket
-                        super[3] = message_dict['message']
+                        super['status'] = 'occupied'
+                        super['client'] = student_ticket
+                        super['clientMessage'] = message_dict['message']
                         # Construct message for response 
-                        student_message = {'message': message_dict['message'], 'serverId': serverId}
+                        student_message = {'name': message_dict['name'], 'message': message_dict['message'], 'serverId': serverId}
                         message_response = json.dumps(student_message)
                         # Encode message
                         message_response = str.encode(message_response)
                         # Send response to student
                         msg = [message_student[0], message_response]
                         socket.send_multipart(msg)
-                        # Update remaining clients in queue
+                        # Update remaining tickets in queue
                         for ticket in ticketQueue:
                             ticket['ticket'] = ticketQueue.index(ticket) + 1
                         break
@@ -270,11 +278,11 @@ def protocol_Remove(client_id, message_dict):
             if len(studentQueue) == 1:
                 # Find supervisor
                 for super in supervisorList:
-                    if message_dict['name'] in super:
+                    if message_dict['name'] in super['name']:
                         # Update values for the supervisor
-                        super[1] = 'occupied'
-                        super[2] = ''
-                        super[3] = ''
+                        super['status'] = 'occupied'
+                        super['client'] = ''
+                        super['clientMessage'] = ''
                         # Construct message for response 
                         student_message = {'message': message_dict['message'], 'serverId': serverId}
                         message_response = json.dumps(student_message)
@@ -288,11 +296,11 @@ def protocol_Remove(client_id, message_dict):
             elif len(studentQueue) > 1:
                 # Find supervisor
                 for super in supervisorList:
-                    if message_dict[''] in super:
+                    if message_dict['name'] in super['name']:
                         # Update values for the supervisor
-                        super[1] = 'occupied'
-                        super[2] = ''
-                        super[3] = ''
+                        super['name'] = 'occupied'
+                        super['client'] = ''
+                        super['clientMessage'] = ''
                         # Construct message for response 
                         student_message = {'message': message_dict['message'], 'serverId': serverId}
                         message_response = json.dumps(student_message)
@@ -309,17 +317,19 @@ print('Please input an ID for the server: ')
 serverId = str(input())
 print('\nContinue with selecting time in seconds for client timeout: ')
 t = int(input())
+print('\nAt last, select a port number for the server: ')
+port = int(input())
 
 context = zmq.Context()
 socket = context.socket(zmq.ROUTER)
-socket.bind('tcp://*:5555')
+socket.bind(f'tcp://*:{port}')
 
 print('Configuring server... Please wait...')
 
 heartThread = threading.Thread(target=protocol_Heartbeat)
 heartThread.start()
 
-print('Server is upp and running...')
+print('Server is up and running...')
 
 while True:
     # Variable to tell if need exist to update all subscribed clients, false at start
@@ -340,7 +350,7 @@ while True:
     if 'attend' in messageDict:
         if clientID not in heartbeatList:
             heartbeatList.append(clientID)   
-        protocol_Attend(messageDict)
+        protocol_Attend(clientID, messageDict)
         
     if 'enterQueue' in messageDict:
         if clientID not in heartbeatList:
@@ -355,7 +365,7 @@ while True:
     if 'remove' in messageDict:
         if clientID not in heartbeatList:
             heartbeatList.append(clientID)   
-        protocol_Remove(clientID, messageDict)
+        protocol_Remove(messageDict)
         
     if not messageDict:
         if clientID not in heartbeatList:

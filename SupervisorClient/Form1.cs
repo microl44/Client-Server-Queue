@@ -29,8 +29,6 @@ namespace SupervisorClient
         private static string port;
         private static string username;
 
-        private static int heartbeatCount = 0;
-
         private static bool isConnected;
         private static bool isInQueue = false;
         private static bool firstMessage = true;
@@ -122,13 +120,10 @@ namespace SupervisorClient
                         extractQueue(jsonContent, "student");
                         extractQueue(jsonContent, "supervisor");
                     }
-                    else if (jsonContent.ContainsKey("message") && jsonContent.ContainsKey("serverId"))
-                    {
-                        ShowMessage("Message from Supervisor", jsonContent.GetValue("message").ToString());
-                    }
                 }
                 catch(Exception e)
                 {
+                    System.Diagnostics.Debug.WriteLine(e.Message);
                     continue;
                 }
             }
@@ -182,20 +177,35 @@ namespace SupervisorClient
 
                 Connecter.socket.Connect("tcp://" + ip + ":" + port);
                 isConnected = true;
+                serverList.Add("temp");
 
                 return true;
             }
             return true;
         }
-        public void changeTextBox(string stringToAdd)
+        public void changeTextBox(string stringToAdd, string type)
         {
-            try
+            if(type == "student")
             {
-                TBStudentQueue.Invoke((MethodInvoker)(() => TBStudentQueue.Text = "---Current Student Queue--- \n " + stringToAdd));
+                try
+                {
+                    TBStudentQueue.Invoke((MethodInvoker)(() => TBStudentQueue.Text = "---Current Student Queue--- \n " + stringToAdd));
+                }
+                catch(Exception e)
+                {
+                    System.Diagnostics.Debug.WriteLine(e.Message);
+                }
             }
-            catch(Exception e)
+            else if (type == "supervisor")
             {
-                System.Diagnostics.Debug.WriteLine(e.Message);
+                try
+                {
+                    TBSupervisorQueue.Invoke((MethodInvoker)(() => TBSupervisorQueue.Text = "---Current Supervisors--- \n " + stringToAdd));
+                }
+                catch (Exception e)
+                {
+                    System.Diagnostics.Debug.WriteLine(e.Message);
+                }
             }
         }
 
@@ -227,7 +237,7 @@ namespace SupervisorClient
                 currentSupervisorQueue = "";
                 supervisorList.Clear();
 
-                foreach (var x in Jmessage.GetValue("supervisor"))
+                foreach (var x in Jmessage.GetValue("supervisors"))
                 {
                     supervisorList.Add(x["name"].ToString() + " ");
                     supervisorList.Add(x["status"].ToString() + " ");
@@ -243,19 +253,20 @@ namespace SupervisorClient
         }
         public void UpdateQueueGUI()
         {
-            currentStudentQueue = "";
             Thread.Sleep(3000);
             while (true)
             {
                 Thread.Sleep(1000);
                 if (isInQueue)
                 {
-                    changeTextBox(currentStudentQueue);
+                    changeTextBox(currentStudentQueue, "student");
+                    changeTextBox(currentSupervisorQueue, "supervisor");
                     lastKnownStudentQueue = currentStudentQueue;
                 }
                 else if (!isInQueue)
                 {
-                    changeTextBox("");
+                    changeTextBox("", "student");
+                    changeTextBox("", "supervisor");
                 }
             }
         }
@@ -264,8 +275,11 @@ namespace SupervisorClient
         {
             if (CreateConnection())
             {
-                string attendTicket = "{\"attend\":true,\"name\":\"" + username + "\"}";
-                SendMessage(attendTicket);
+                foreach(string server in serverList)
+                {
+                    string attendTicket = "{\"attend\":true,\"name\":\"" + username + "\"}";
+                    SendMessage(attendTicket);
+                }
             }
         }
 
@@ -273,10 +287,13 @@ namespace SupervisorClient
         {
             if (CreateConnection())
             {
-                string subscribeToQueue = "{\"subscribe\":true}";
-                SendMessage(subscribeToQueue);
-                isInQueue = true;
-                lastKnownStudentQueue = "";
+                foreach (string server in serverList)
+                {
+                    string subscribeToQueue = "{\"subscribe\":true}";
+                    SendMessage(subscribeToQueue);
+                    isInQueue = true;
+                    lastKnownStudentQueue = "";
+                }
             }
         }
 
@@ -284,11 +301,14 @@ namespace SupervisorClient
         {
             if (isConnected)
             {
-                string RemovesubscribeToQueue = "{\"subscribe\":false}";
-                SendMessage(RemovesubscribeToQueue);
-                clearTextBox();
-                currentStudentQueue = "";
-                isInQueue = false;
+                foreach(string server in serverList)
+                {
+                    string RemovesubscribeToQueue = "{\"subscribe\":false}";
+                    SendMessage(RemovesubscribeToQueue);
+                    clearTextBox();
+                    currentStudentQueue = "";
+                    isInQueue = false;
+                }
             }
         }
 
@@ -296,9 +316,12 @@ namespace SupervisorClient
         {
             if (CreateConnection())
             {
-                string message = richTextBoxMessageToSend.Text;
-                string enterQueueTicket = "{\"remove\":false,\"name:\"" + username + "\", message\":\"" + message + "\"}";
-                SendMessage(enterQueueTicket);
+                foreach (string server in serverList)
+                {
+                    string message = richTextBoxMessageToSend.Text;
+                    string enterQueueTicket = "{\"remove\":false,\"name:\"" + username + "\", message\":\"" + message + "\"}";
+                    SendMessage(enterQueueTicket);
+                }
             }
         }
 
@@ -323,9 +346,20 @@ namespace SupervisorClient
             }
         }
 
-        private void button3_Click(object sender, EventArgs e)
+        private void BtnExit(object sender, EventArgs e)
         {
             Application.Exit();
+        }
+
+        private void BtnStopSupervising(object sender, EventArgs e)
+        {
+            username = textBox1.Text;
+            foreach(string server in serverList)
+            {
+                string attendTicket = "{\"attend\":false,\"name\":\"" + username + "\"}";
+                SendMessage(attendTicket);
+                System.Diagnostics.Debug.WriteLine("Should not be in supervisor queue anymore");
+            }
         }
     }
 }
