@@ -11,6 +11,7 @@ namespace SupervisorClient
 {
     public partial class Form1 : Form
     {
+        //constants to change timeout and second client port
         private const double TIMEOUT_LIMIT = 30;
         private const string SECOND_CLIENT_PORT = "5556";
 
@@ -27,9 +28,9 @@ namespace SupervisorClient
         private static bool isConnected;
         private static bool isInQueue = false;
         private static bool firstMessage = true;
+
         private static System.Diagnostics.Stopwatch stopwatch;
 
-        private DateTime lastCalled;
         public Form1()
         {
             InitializeComponent();
@@ -50,6 +51,7 @@ namespace SupervisorClient
             UpdateGUI.Start();
         }
 
+        //honestly no idea why this class is here. Too much refactoring required if changed. Now counts as legacy-code. Don't touch the legacy-code.
         public class Connecter
         {
             public static DealerSocket socket;
@@ -57,10 +59,11 @@ namespace SupervisorClient
             public static NetMQMessage messageToSend;
             public static NetMQMessage messageToRecieve;
 
-            public static string currentPlace;
             public static string textBoxText;
         }
 
+        //main function. Creates poller with two ports, each listens on port and processes msg when buffer isn't empty.
+        //Restarts timeout stopwatch after a message arrives.
         public void ThreadWork()
         {
             while (true)
@@ -98,62 +101,58 @@ namespace SupervisorClient
 
         public void HandleMessage(JObject jsonContent)
         {
-            try
+            //System.Diagnostics.Debug.WriteLine(jsonContent.ToString());
+            //if it's the first message and contains only serverId, it means some heartbeat got missdirected. Ignore it and listen for new message.
+            if (firstMessage == true && jsonContent.Count == 1 && jsonContent.ContainsKey("serverId"))
             {
-                //System.Diagnostics.Debug.WriteLine(jsonContent.ToString());
-                //if it's the first message and contains only serverId, it means some heartbeat got missdirected. Ignore it and listen for new message.
-                if (firstMessage == true && jsonContent.Count == 1 && jsonContent.ContainsKey("serverId"))
-                {
-                    firstMessage = false;
-                    return;
-                }
-
-                if (firstMessage == false && jsonContent.Count == 1 && jsonContent.ContainsKey("serverId"))
-                {
-                    string heartbeat = "{}";
-                    SendMessage(heartbeat);
-                    System.Diagnostics.Debug.WriteLine("heartbeat recieved and sent");
-                    return;
-                }
-
-                // if message is ticket response, add serverId to list of servers and update the users current place.
-                if (jsonContent.ContainsKey("ticket") && jsonContent.ContainsKey("name") && jsonContent.ContainsKey("serverId"))
-                {
-                    if (firstMessage)
-                    {
-                        serverList.Remove("temp");
-                    }
-                    if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
-                    {
-                        serverList.Add(jsonContent.GetValue("serverId").ToString());
-                    }
-
-                    firstMessage = false;
-                    Connecter.currentPlace = jsonContent.GetValue("ticket").ToString();
-                }
-                else if (jsonContent.ContainsKey("queue") && jsonContent.ContainsKey("supervisors") && jsonContent.ContainsKey("serverId"))
-                {
-                    if (firstMessage)
-                    {
-                        serverList.Remove("temp");
-                    }
-                    if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
-                    {
-                        serverList.Add(jsonContent.GetValue("serverId").ToString());
-                    }
-
-                    firstMessage = false;
-
-                    extractQueue(jsonContent, "student");
-                    extractQueue(jsonContent, "supervisor");
-                }
-            }
-            catch (Exception e)
-            {
-                System.Diagnostics.Debug.WriteLine(e.Message);
+                firstMessage = false;
                 return;
             }
+
+            // is heartbeat. Send heartbeat back
+            if (firstMessage == false && jsonContent.Count == 1 && jsonContent.ContainsKey("serverId"))
+            {
+                string heartbeat = "{}";
+                SendMessage(heartbeat);
+                System.Diagnostics.Debug.WriteLine("heartbeat recieved and sent");
+                return;
+            }
+
+            // if message is ticket response, add serverId to list of servers and update the users current place.
+            if (jsonContent.ContainsKey("ticket") && jsonContent.ContainsKey("name") && jsonContent.ContainsKey("serverId"))
+            {
+                if (firstMessage)
+                {
+                    serverList.Remove("temp");
+                }
+                if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
+                {
+                    serverList.Add(jsonContent.GetValue("serverId").ToString());
+                }
+
+                firstMessage = false;
+            }
+
+            // if message is a queue update, extract the queue and add client if client doesn't exist in client list.
+            else if (jsonContent.ContainsKey("queue") && jsonContent.ContainsKey("supervisors") && jsonContent.ContainsKey("serverId"))
+            {
+                if (firstMessage)
+                {
+                    serverList.Remove("temp");
+                }
+                if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
+                {
+                    serverList.Add(jsonContent.GetValue("serverId").ToString());
+                }
+
+                firstMessage = false;
+
+                extractQueue(jsonContent, "student");
+                extractQueue(jsonContent, "supervisor");
+            }
         }
+
+        // send every message to both ports.
         public void SendMessage(string MessageToSend)
         {
             Connecter.socket.SendFrame(MessageToSend);
@@ -175,6 +174,8 @@ namespace SupervisorClient
             popupForm.Show();
         }
 
+        // Establishes a connection if none exists. If connection exists, update username based on textbox.
+        // Responsible for showing proper error message to user in case of faulty input.
         public bool CreateConnection()
         {
             if(isConnected)
@@ -187,6 +188,7 @@ namespace SupervisorClient
                 port = TBPort.Text;
                 username = textBox1.Text;
 
+                // if field empty
                 if (port == "" || TBPort.Text == "" || username == "")
                 {
                     ShowMessage("Empty Field Error", "One or more textfields were left empty. Using the default config which is IP = 'LOCALHOST' PORT = '5555' USERNAME = 'Micke.");
@@ -195,6 +197,8 @@ namespace SupervisorClient
                     port = "5555";
                     username = "Micke";
                 }
+
+                // if port out of range
                 else if (Int64.Parse(port) > 65535)
                 {
                     ShowMessage("PORT out of bounds error", "Port must be a valid number between 1 and 65355.");
@@ -212,6 +216,8 @@ namespace SupervisorClient
             }
             return true;
         }
+
+        // updates corresponding text-box based on latest fetched values.
         public void changeTextBox(string stringToAdd, string type)
         {
             if(type == "student")
@@ -238,13 +244,16 @@ namespace SupervisorClient
             }
         }
 
+        // resets text boxes via MethodInvoker as it's cross-thread communication.
         public void clearTextBox()
         {
             TBStudentQueue.Invoke((MethodInvoker)(() => TBStudentQueue.Text = "---Current Student Queue---"));
         }
 
+        // extracts queue values from json object.
         public void extractQueue(JObject Jmessage, string type)
         {
+            // for ticket queue
             if (Jmessage.ContainsKey("queue") && type == "student")
             {
                 currentStudentQueue = "";
@@ -261,6 +270,8 @@ namespace SupervisorClient
                     currentStudentQueue += s;
                 }
             }
+
+            // for supervisor queue
             else if (type == "supervisor")
             {
                 currentSupervisorQueue = "";
@@ -281,6 +292,7 @@ namespace SupervisorClient
                     //supervisorList.Add(x["clientMessage"].ToString() + " \n ");
                 }
 
+                // string builder for the final string used to update text-box
                 foreach (var x in supervisorList)
                 {
                     currentSupervisorQueue += x;
@@ -288,11 +300,15 @@ namespace SupervisorClient
             }
         }
 
+        // Update text-boxes if connection timed out.
         public void ConnectionTimeOut()
         {
             TBStudentQueue.Invoke((MethodInvoker)(() => TBStudentQueue.Text = "CONNECTION TIMED OUT"));
             TBSupervisorQueue.Invoke((MethodInvoker)(() => TBSupervisorQueue.Text = "CONNECTION TIMED OUT"));
         }
+
+        // Updates GUI every second. Sleep 1 second for main form controller to have time to build.
+        // If time passes TIMEOUT_LIMIT, raise error flag and put system in error mode until an incoming message resumes the process.
         public void UpdateQueueGUI()
         {
             Thread.Sleep(3000);
@@ -318,6 +334,7 @@ namespace SupervisorClient
             }
         }
 
+        // following clicks are self-explanatory. Simply send message to server. Read function name for explanation.
         private void BtnEnterQueue_Click(object sender, EventArgs e)
         {
             if (CreateConnection())
@@ -374,6 +391,7 @@ namespace SupervisorClient
             Application.Exit();
         }
 
+        // Remove self from supervisor list
         private void BtnStopSupervising(object sender, EventArgs e)
         {
             username = textBox1.Text;

@@ -11,6 +11,7 @@ namespace Client
 {
     public partial class Form1 : Form
     {
+        //constants to change timeout and second client port
         private const double TIMEOUT_LIMIT = 30;
         private const string SECOND_CLIENT_PORT = "5556";
 
@@ -28,6 +29,7 @@ namespace Client
         private static bool isConnected;
         private static bool isInQueue = false;
         private static bool firstMessage = true;
+
         private static System.Diagnostics.Stopwatch stopwatch;
 
         public Form1()
@@ -57,11 +59,13 @@ namespace Client
             public static NetMQMessage messageToSend;
             public static NetMQMessage messageToRecieve;
 
-            public static string currentPlace;
             public static string textBoxText;
+            public static string currentPlace;
 
         }
 
+        //main function. Creates poller with two ports, each listens on port and processes msg when buffer isn't empty.
+        //Restarts timeout stopwatch after a message arrives.
         public void ThreadWork()
         {
             while (true)
@@ -99,9 +103,9 @@ namespace Client
             };
         }
 
+        //main functionality for interpreting each message. Runs different functionality depending on what array keys exists in json object.
         public void HandleMessage(JObject jsonContent)
         {
-            //System.Diagnostics.Debug.WriteLine(jsonContent.ToString());
             //if it's the first message and contains only serverId, it means some heartbeat got missdirected. Ignore it and listen for new message.
             if (firstMessage == true && jsonContent.Count == 1 && jsonContent.ContainsKey("serverId"))
             {
@@ -109,6 +113,7 @@ namespace Client
                 return;
             }
 
+            // is heartbeat. Send heartbeat back
             if (firstMessage == false && jsonContent.Count == 1 && jsonContent.ContainsKey("serverId"))
             {
                 string heartbeat = "{}";
@@ -117,13 +122,9 @@ namespace Client
                 return;
             }
 
-            // if message is ticket response, add serverId to list of servers and update the users current place.
+            // if message is ticket response, add serverId to list of servers and update the users current place. WIP.
             if (jsonContent.ContainsKey("ticket") && jsonContent.ContainsKey("name") && jsonContent.ContainsKey("serverId"))
             {
-                if (firstMessage)
-                {
-                    serverList.Remove("temp");
-                }
                 if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
                 {
                     serverList.Add(jsonContent.GetValue("serverId").ToString());
@@ -132,6 +133,8 @@ namespace Client
                 firstMessage = false;
                 Connecter.currentPlace = jsonContent.GetValue("ticket").ToString();
             }
+
+            // if message is a queue update, extract the queue and add client if client doesn't exist in client list.
             else if (jsonContent.ContainsKey("queue") && jsonContent.ContainsKey("supervisors") && jsonContent.ContainsKey("serverId"))
             {
                 if (firstMessage)
@@ -148,11 +151,15 @@ namespace Client
                 extractQueue(jsonContent, "student");
                 extractQueue(jsonContent, "supervisor");
             }
+
+            // admin response, update text string determening admin msg textbox.
             else if (jsonContent.ContainsKey("name") && jsonContent.ContainsKey("clientMessage") && jsonContent.ContainsKey("serverId"))
             {
                 lastAdminMessage = jsonContent.GetValue("clientMessage").ToString();
             }
         }
+
+        // send every message to both ports.
         public void SendMessage(string MessageToSend)
         {
             Connecter.socket.SendFrame(MessageToSend);
@@ -175,6 +182,8 @@ namespace Client
             popupForm.Show();
         }
 
+        // Establishes a connection if none exists. If connection exists, update username based on textbox.
+        // Responsible for showing proper error message to user in case of faulty input.
         public bool FetchInfo()
         {
             if (isConnected)
@@ -187,6 +196,7 @@ namespace Client
                 port = TBPort.Text;
                 username = textBox1.Text;
 
+                // if field empty
                 if (port == "" || TBPort.Text == "" || username == "")
                 {
                     ShowMessage("Empty Field Error", "One or more textfields were left empty. Using the default config which is IP = 'LOCALHOST' PORT = '5555' USERNAME = 'Micke.");
@@ -195,6 +205,8 @@ namespace Client
                     port = "5555";
                     username = "Micke";
                 }
+
+                // if port out of range
                 else if (Int64.Parse(port) > 65535)
                 {
                     ShowMessage("PORT out of bounds error", "Port must be a valid number between 1 and 65355.");
@@ -212,6 +224,8 @@ namespace Client
             }
             return true;
         }
+
+        // updates corresponding text-box based on latest fetched values.
         public void changeTextBox(string stringToAdd, string type)
         {
             if (type == "student")
@@ -242,6 +256,7 @@ namespace Client
             }
         }
 
+        // resets text boxes via MethodInvoker as it's cross-thread communication.
         public void clearTextBox()
         {
             TBStudentQueue.Invoke((MethodInvoker)(() => TBStudentQueue.Text = "---Current Student Queue---"));
@@ -249,8 +264,10 @@ namespace Client
             TBAdminMessage.Invoke((MethodInvoker)(() => TBAdminMessage.Text = "---Last Admin Message--"));
         }
 
+        // extracts queue values from json object.
         public void extractQueue(JObject Jmessage, string type)
         {
+            // for ticket queue
             if (Jmessage.ContainsKey("queue") && type == "student")
             {
                 currentStudentQueue = "";
@@ -267,6 +284,8 @@ namespace Client
                     currentStudentQueue += s;
                 }
             }
+
+            // for supervisor queue
             else if (Jmessage.ContainsKey("supervisors") && type == "supervisor")
             {
                 currentSupervisorQueue = "";
@@ -287,6 +306,7 @@ namespace Client
                     //supervisorList.Add(x["clientMessage"].ToString() + " \n ");
                 }
 
+                // string builder for the final string used to update text-box
                 foreach (var x in supervisorList)
                 {
                     currentSupervisorQueue += x;
@@ -294,12 +314,16 @@ namespace Client
             }
         }
 
+        // Update text-boxes if connection timed out.
         public void ConnectionTimeOut()
         {
             TBStudentQueue.Invoke((MethodInvoker)(() => TBStudentQueue.Text = "CONNECTION TIMED OUT"));
             TBSupervisorQueue.Invoke((MethodInvoker)(() => TBSupervisorQueue.Text = "CONNECTION TIMED OUT"));
             TBAdminMessage.Invoke((MethodInvoker)(() => TBAdminMessage.Text = "CONNECTION TIMED OUT"));
         }
+
+        // Updates GUI every second. Sleep 1 second for main form controller to have time to build.
+        // If time passes TIMEOUT_LIMIT, raise error flag and put system in error mode until an incoming message resumes the process.
         public void UpdateQueueGUI()
         {
             Thread.Sleep(1000);
@@ -329,6 +353,7 @@ namespace Client
             }
         }
 
+        // following clicks are self-explanatory. Simply send message to server. Read function name for explanation.
         private void BtnEnterQueue_Click(object sender, EventArgs e)
         {
             if (FetchInfo())
