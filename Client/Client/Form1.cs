@@ -1,24 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using NetMQ;
 using NetMQ.Sockets;
 using System.Threading;
-using System.Text.Json;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.Timers;
 
 namespace Client
 {
     public partial class Form1 : Form
     {
+        private const double TIMEOUT_LIMIT = 30;
+        private const string SECOND_CLIENT_PORT = "5556";
+
         private static string currentStudentQueue = "";
         private static string currentSupervisorQueue = "";
         private static List<string> serverList = new List<string>();
@@ -33,8 +28,8 @@ namespace Client
         private static bool isConnected;
         private static bool isInQueue = false;
         private static bool firstMessage = true;
+        private static System.Diagnostics.Stopwatch stopwatch;
 
-        System.Timers.Timer timer = new System.Timers.Timer(10000);
         public Form1()
         {
             InitializeComponent();
@@ -46,9 +41,7 @@ namespace Client
             TBStudentQueue.ReadOnly = true;
             TBStudentQueue.ShortcutsEnabled = false;
 
-            serverList.Add("temp");
-
-            timer.Elapsed += OnTimedEvent;
+            stopwatch = new System.Diagnostics.Stopwatch();
 
             Thread doSomething = new Thread(() => ThreadWork());
             doSomething.Start();
@@ -69,11 +62,6 @@ namespace Client
 
         }
 
-        private static void OnTimedEvent(Object source, ElapsedEventArgs e)
-        {
-            System.Diagnostics.Debug.WriteLine("You're out!");
-        }
-
         public void ThreadWork()
         {
             while (true)
@@ -85,6 +73,8 @@ namespace Client
                         // Recieve multipart message, encode and store into variable, parse message to json object.
                         Connecter.messageToRecieve = Connecter.socket.ReceiveMultipartMessage();
 
+                        stopwatch.Restart();
+
                         var content = Encoding.UTF8.GetString(Connecter.messageToRecieve[0].Buffer);
                         System.Diagnostics.Debug.WriteLine(content);
                         JObject jsonContent = JObject.Parse(content);
@@ -94,8 +84,9 @@ namespace Client
                     Connecter.socket1.ReceiveReady += (s, a) =>
                     {
                         // Recieve multipart message, encode and store into variable, parse message to json object.
-                        System.Diagnostics.Debug.WriteLine("Fuck you from socket protocol 1");
                         Connecter.messageToRecieve = Connecter.socket1.ReceiveMultipartMessage();
+
+                        stopwatch.Restart();
 
                         var content = Encoding.UTF8.GetString(Connecter.messageToRecieve[0].Buffer);
                         System.Diagnostics.Debug.WriteLine(content);
@@ -131,7 +122,6 @@ namespace Client
             {
                 if (firstMessage)
                 {
-                    timer.Start();
                     serverList.Remove("temp");
                 }
                 if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
@@ -146,7 +136,6 @@ namespace Client
             {
                 if (firstMessage)
                 {
-                    timer.Start();
                     serverList.Remove("temp");
                 }
                 if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
@@ -168,6 +157,7 @@ namespace Client
         {
             Connecter.socket.SendFrame(MessageToSend);
             Connecter.socket1.SendFrame(MessageToSend);
+            stopwatch.Start();
         }
 
         public void ShowMessage(string windowTitle, string message)
@@ -214,7 +204,7 @@ namespace Client
                 }
 
                 Connecter.socket.Connect("tcp://" + ip + ":" + port);
-                Connecter.socket1.Connect("tcp://" + ip + ":" + "5556");
+                Connecter.socket1.Connect("tcp://" + ip + ":" + SECOND_CLIENT_PORT);
                 System.Diagnostics.Debug.WriteLine("connected to both");
                 isConnected = true;
 
@@ -306,16 +296,21 @@ namespace Client
 
         public void ConnectionTimeOut()
         {
-            while(true)
-            {
-
-            }
+            TBStudentQueue.Invoke((MethodInvoker)(() => TBStudentQueue.Text = "CONNECTION TIMED OUT"));
+            TBSupervisorQueue.Invoke((MethodInvoker)(() => TBSupervisorQueue.Text = "CONNECTION TIMED OUT"));
+            TBAdminMessage.Invoke((MethodInvoker)(() => TBAdminMessage.Text = "CONNECTION TIMED OUT"));
         }
         public void UpdateQueueGUI()
         {
             Thread.Sleep(1000);
             while (true)
             {
+                double timeElapsed = stopwatch.Elapsed.TotalSeconds;
+                if(timeElapsed >= TIMEOUT_LIMIT)
+                {
+                    ConnectionTimeOut();
+                }
+
                 Thread.Sleep(1000);
                 if (isInQueue)
                 {
@@ -338,7 +333,6 @@ namespace Client
         {
             if (FetchInfo())
             {
-                timer.Start();
                 string enterQueueTicket = "{\"enterQueue\":true,\"name\":\"" + username + "\"}";
                 SendMessage(enterQueueTicket);
             }
@@ -348,7 +342,6 @@ namespace Client
         {
             if (FetchInfo())
             {
-                timer.Start();
                 string subscribeToQueue = "{\"subscribe\":true}";
                 SendMessage(subscribeToQueue);
                 isInQueue = true;
@@ -359,7 +352,6 @@ namespace Client
         {
             if (isConnected)
             {
-                timer.Start();
                 string RemovesubscribeToQueue = "{\"subscribe\":false}";
                 SendMessage(RemovesubscribeToQueue);
                 clearTextBox();

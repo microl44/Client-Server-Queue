@@ -1,25 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using NetMQ;
 using NetMQ.Sockets;
 using System.Threading;
-using System.Text.Json;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.Timers;
 
 namespace SupervisorClient
 {
     public partial class Form1 : Form
     {
-        private static string lastKnownStudentQueue = "UNK";
+        private const double TIMEOUT_LIMIT = 30;
+        private const string SECOND_CLIENT_PORT = "5556";
+
         private static string currentStudentQueue = "";
         private static string currentSupervisorQueue = "";
         private static List<string> serverList = new List<string>();
@@ -33,6 +27,7 @@ namespace SupervisorClient
         private static bool isConnected;
         private static bool isInQueue = false;
         private static bool firstMessage = true;
+        private static System.Diagnostics.Stopwatch stopwatch;
 
         private DateTime lastCalled;
         public Form1()
@@ -42,12 +37,11 @@ namespace SupervisorClient
             Connecter.socket1 = new DealerSocket();
             Connecter.messageToSend = new NetMQMessage();
             Connecter.messageToRecieve = new NetMQMessage();
-            Connecter.asyncSocket = new NetMQRuntime();
 
             TBStudentQueue.ReadOnly = true;
             TBStudentQueue.ShortcutsEnabled = false;
 
-            serverList.Add("temp");
+            stopwatch = new System.Diagnostics.Stopwatch();
 
             Thread doSomething = new Thread(() => ThreadWork());
             doSomething.Start();
@@ -62,8 +56,6 @@ namespace SupervisorClient
             public static DealerSocket socket1;
             public static NetMQMessage messageToSend;
             public static NetMQMessage messageToRecieve;
-            public static NetMQRuntime asyncSocket;
-            public static System.Timers.Timer timer = new System.Timers.Timer(interval: 5000);
 
             public static string currentPlace;
             public static string textBoxText;
@@ -78,8 +70,9 @@ namespace SupervisorClient
                     Connecter.socket.ReceiveReady += (s, a) =>
                     {
                         // Recieve multipart message, encode and store into variable, parse message to json object.
-                        System.Diagnostics.Debug.WriteLine("Fuck you from socket protocol 1");
                         Connecter.messageToRecieve = Connecter.socket.ReceiveMultipartMessage();
+
+                        stopwatch.Restart();
 
                         var content = Encoding.UTF8.GetString(Connecter.messageToRecieve[0].Buffer);
                         System.Diagnostics.Debug.WriteLine(content);
@@ -90,7 +83,6 @@ namespace SupervisorClient
                     Connecter.socket1.ReceiveReady += (s, a) =>
                     {
                         // Recieve multipart message, encode and store into variable, parse message to json object.
-                        System.Diagnostics.Debug.WriteLine("Fuck you from socket protocol 1");
                         Connecter.messageToRecieve = Connecter.socket1.ReceiveMultipartMessage();
 
                         var content = Encoding.UTF8.GetString(Connecter.messageToRecieve[0].Buffer);
@@ -166,12 +158,7 @@ namespace SupervisorClient
         {
             Connecter.socket.SendFrame(MessageToSend);
             Connecter.socket1.SendFrame(MessageToSend);
-        }
-
-        public void ThrowError()
-        {
-            TBStudentQueue.Invoke((MethodInvoker)(() => TBSupervisorQueue.Text = "FATAL ERROR HAS OCCURRED \n CONNECTION TO SERVER TIMED OUT"));
-            TBSupervisorQueue.Invoke((MethodInvoker)(() => TBSupervisorQueue.Text = "FATAL ERROR HAS OCCURRED \n CONNECTION TO SERVER TIMED OUT"));
+            stopwatch.Start();
         }
 
         public void ShowMessage(string windowTitle, string message)
@@ -217,7 +204,7 @@ namespace SupervisorClient
                 }
 
                 Connecter.socket.Connect("tcp://" + ip + ":" + port);
-                Connecter.socket1.Connect("tcp://" + ip + ":" + "5556");
+                Connecter.socket1.Connect("tcp://" + ip + ":" + SECOND_CLIENT_PORT);
                 System.Diagnostics.Debug.WriteLine("connected to both");
                 isConnected = true;
 
@@ -300,17 +287,28 @@ namespace SupervisorClient
                 }
             }
         }
+
+        public void ConnectionTimeOut()
+        {
+            TBStudentQueue.Invoke((MethodInvoker)(() => TBStudentQueue.Text = "CONNECTION TIMED OUT"));
+            TBSupervisorQueue.Invoke((MethodInvoker)(() => TBSupervisorQueue.Text = "CONNECTION TIMED OUT"));
+        }
         public void UpdateQueueGUI()
         {
             Thread.Sleep(3000);
             while (true)
             {
+                double timeElapsed = stopwatch.Elapsed.TotalSeconds;
+                if (timeElapsed >= TIMEOUT_LIMIT)
+                {
+                    ConnectionTimeOut();
+                }
+
                 Thread.Sleep(1000);
                 if (isInQueue)
                 {
                     changeTextBox(currentStudentQueue, "student");
                     changeTextBox(currentSupervisorQueue, "supervisor");
-                    lastKnownStudentQueue = currentStudentQueue;
                 }
                 else if (!isInQueue)
                 {
@@ -324,11 +322,8 @@ namespace SupervisorClient
         {
             if (CreateConnection())
             {
-                foreach(string server in serverList)
-                {
-                    string attendTicket = "{\"attend\":true,\"name\":\"" + username + "\"}";
-                    SendMessage(attendTicket);
-                }
+                string attendTicket = "{\"attend\":true,\"name\":\"" + username + "\"}";
+                SendMessage(attendTicket);
             }
         }
 
@@ -336,13 +331,9 @@ namespace SupervisorClient
         {
             if (CreateConnection())
             {
-                foreach (string server in serverList)
-                {
-                    string subscribeToQueue = "{\"subscribe\":true}";
-                    SendMessage(subscribeToQueue);
-                    isInQueue = true;
-                    lastKnownStudentQueue = "";
-                }
+                string subscribeToQueue = "{\"subscribe\":true}";
+                SendMessage(subscribeToQueue);
+                isInQueue = true;
             }
         }
 
@@ -350,14 +341,11 @@ namespace SupervisorClient
         {
             if (isConnected)
             {
-                foreach(string server in serverList)
-                {
-                    string RemovesubscribeToQueue = "{\"subscribe\":false}";
-                    SendMessage(RemovesubscribeToQueue);
-                    clearTextBox();
-                    currentStudentQueue = "";
-                    isInQueue = false;
-                }
+                string RemovesubscribeToQueue = "{\"subscribe\":false}";
+                SendMessage(RemovesubscribeToQueue);
+                clearTextBox();
+                currentStudentQueue = "";
+                isInQueue = false;
             }
         }
 
@@ -365,12 +353,9 @@ namespace SupervisorClient
         {
             if (CreateConnection())
             {
-                foreach (string server in serverList)
-                {
-                    string message = richTextBoxMessageToSend.Text;
-                    string enterQueueTicket = "{\"remove\":true,\"name\":\"" + username + "\", \"message\":\"" + message + "\"}";
-                    SendMessage(enterQueueTicket);
-                }
+                string message = richTextBoxMessageToSend.Text;
+                string enterQueueTicket = "{\"remove\":true,\"name\":\"" + username + "\", \"message\":\"" + message + "\"}";
+                SendMessage(enterQueueTicket);
             }
         }
 
@@ -392,12 +377,9 @@ namespace SupervisorClient
         private void BtnStopSupervising(object sender, EventArgs e)
         {
             username = textBox1.Text;
-            foreach(string server in serverList)
-            {
-                string attendTicket = "{\"attend\":false,\"name\":\"" + username + "\"}";
-                SendMessage(attendTicket);
-                System.Diagnostics.Debug.WriteLine("Should not be in supervisor queue anymore");
-            }
+            string attendTicket = "{\"attend\":false,\"name\":\"" + username + "\"}";
+            SendMessage(attendTicket);
+            System.Diagnostics.Debug.WriteLine("Should not be in supervisor queue anymore");
         }
     }
 }
