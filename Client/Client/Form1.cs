@@ -18,8 +18,8 @@ namespace Client
 {
     public partial class Form1 : Form
     {
-        public static string lastKnownStudentQueue = "";
-        public static string currentStudentQueue = "";
+        private static string lastKnownStudentQueue = "UNK";
+        private static string currentStudentQueue = "";
         private static string currentSupervisorQueue = "";
         private static List<string> serverList = new List<string>();
         private static List<string> studentQueue = new List<string>();
@@ -30,7 +30,8 @@ namespace Client
         private static string username;
 
         private static bool isConnected;
-        private static bool isInQueue;
+        private static bool isInQueue = false;
+        private static bool firstMessage = true;
         public Form1()
         {
             InitializeComponent();
@@ -55,138 +56,172 @@ namespace Client
             public static NetMQMessage messageToSend;
             public static NetMQMessage messageToRecieve;
             public static NetMQRuntime asyncSocket;
+            public static System.Timers.Timer timer = new System.Timers.Timer(interval: 5000);
 
             public static string currentPlace;
             public static string textBoxText;
         }
 
-        private void BtnEnterQueue_Click(object sender, EventArgs e)
+        public void ThreadWork()
         {
-            if (FetchInfo())
+            Form popupForm2 = new Form();
+            RichTextBox popupFormText2 = new RichTextBox();
+            popupFormText2.Width = popupForm2.Width - 5;
+            popupFormText2.Height = popupForm2.Height;
+            while (true)
             {
-                string enterQueueTicket = "{\"enterQueue\":true,\"name\":\"" + username + "\"}";
-                SendMessage(enterQueueTicket);
+                try
+                {
+                    // Recieve multipart message, encode and store into variable, parse message to json object.
+                    Connecter.messageToRecieve = Connecter.socket.ReceiveMultipartMessage();
+                    var content = Encoding.UTF8.GetString(Connecter.messageToRecieve[0].Buffer);
+                    System.Diagnostics.Debug.WriteLine(content);
+                    JObject jsonContent = JObject.Parse(content);
+
+                    //System.Diagnostics.Debug.WriteLine(jsonContent.ToString());
+                    //if it's the first message and contains only serverId, it means some heartbeat got missdirected. Ignore it and listen for new message.
+                    if (firstMessage == true && jsonContent.Count == 1 && jsonContent.ContainsKey("serverId"))
+                    {
+                        firstMessage = false;
+                        continue;
+                    }
+
+                    if (firstMessage == false && jsonContent.Count == 1 && jsonContent.ContainsKey("serverId"))
+                    {
+                        string heartbeat = "{}";
+                        SendMessage(heartbeat);
+                        System.Diagnostics.Debug.WriteLine("heartbeat recieved and sent");
+                        continue;
+                    }
+
+                    // if message is ticket response, add serverId to list of servers and update the users current place.
+                    if (jsonContent.ContainsKey("ticket") && jsonContent.ContainsKey("name") && jsonContent.ContainsKey("serverId"))
+                    {
+                        if (firstMessage)
+                        {
+                            if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
+                            {
+                                serverList.Add(jsonContent.GetValue("serverId").ToString());
+                            }
+                            firstMessage = false;
+                        }
+                        Connecter.currentPlace = jsonContent.GetValue("ticket").ToString();
+                    }
+                    else if (jsonContent.ContainsKey("queue") && jsonContent.ContainsKey("supervisors") && jsonContent.ContainsKey("serverId"))
+                    {
+                        if (firstMessage)
+                        {
+                            if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
+                            {
+                                serverList.Add(jsonContent.GetValue("serverId").ToString());
+                            }
+                            firstMessage = false;
+                        }
+                        extractQueue(jsonContent, "student");
+                        //extractQueue(jsonContent, "supervisor");
+                    }
+                    else if (jsonContent.ContainsKey("message") && jsonContent.ContainsKey("serverId"))
+                    {
+                        ShowMessage("Message from Supervisor", jsonContent.GetValue("message").ToString());
+                    }
+                }
+                catch (Exception e)
+                {
+                    System.Diagnostics.Debug.WriteLine(e.Message);
+                    continue;
+                }
             }
         }
-
-        private void BtnSubscribe_Click(object sender, EventArgs e)
-        {
-            if (FetchInfo())
-            {
-                string subscribeToQueue = "{\"subscribe\":true}";
-                SendMessage(subscribeToQueue);
-                isInQueue = true;
-            }
-        }
-
         public void SendMessage(string MessageToSend)
         {
             Connecter.socket.SendFrame(MessageToSend);
         }
 
+        public void ShowMessage(string windowTitle, string message)
+        {
+            Form popupForm = new Form();
+            RichTextBox popupFormText = new RichTextBox();
+            popupFormText.Width = popupForm.Width - 5;
+            popupFormText.Height = popupForm.Height;
+
+            popupForm.Text = windowTitle;
+            popupFormText.Text = message;
+            popupFormText.ReadOnly = true;
+            popupForm.Controls.Add(popupFormText);
+
+            popupForm.Show();
+        }
+
         public bool FetchInfo()
         {
-            Form popupForm = new Form();
-            RichTextBox popupFormText = new RichTextBox();
-            popupFormText.Width = popupForm.Width - 5;
-            popupFormText.Height = popupForm.Height;
-
-            ip = TBIP.Text;
-            port = TBPort.Text;
-            username = textBox1.Text;
-
-            if (ip == "" || port == "" || TBPort.Text == "" || username == "test")
+            if (isConnected)
             {
-                popupFormText.Text = "One or more textfields were left empty. Please provide appropriate values to each config box.";
-                popupForm.Text = "Empty Field Error";
-                popupFormText.ReadOnly = true;
-                popupForm.Controls.Add(popupFormText);
-                popupForm.Show(this);
-
-                isConnected = false;
-                return false;
+                username = textBox1.Text;
             }
-            else if (Int64.Parse(port) > 65535)
+            if (!isConnected)
             {
-                popupFormText.Text = "Port number is too large. Please enter a port number between 1 and 65535";
-                popupForm.Text = "Port Error";
-                popupFormText.ReadOnly = true;
-                popupForm.Controls.Add(popupFormText);
-                popupForm.Show(this);
+                ip = TBIP.Text;
+                port = TBPort.Text;
+                username = textBox1.Text;
 
-                isConnected = false;
-                return false;
+                if (port == "" || TBPort.Text == "" || username == "")
+                {
+                    ShowMessage("Empty Field Error", "One or more textfields were left empty. Using the default config which is IP = 'LOCALHOST' PORT = '5555' USERNAME = 'Micke.");
+
+                    ip = "localhost";
+                    port = "5555";
+                    username = "Micke";
+                }
+                else if (Int64.Parse(port) > 65535)
+                {
+                    ShowMessage("PORT out of bounds error", "Port must be a valid number between 1 and 65355.");
+
+                    isConnected = false;
+                    return false;
+                }
+
+                Connecter.socket.Connect("tcp://" + ip + ":" + port);
+                isConnected = true;
+
+                return true;
             }
-
-            if (username == "")
-            {
-                username = "UNK";
-            }
-            Connecter.socket.Connect("tcp://" + ip + ":" + port);
-            isConnected = true;
-
             return true;
         }
-
-        public void ThreadWork()
+        public void changeTextBox(string stringToAdd, string type)
         {
-            Form popupForm = new Form();
-            RichTextBox popupFormText = new RichTextBox();
-            popupFormText.Width = popupForm.Width - 5;
-            popupFormText.Height = popupForm.Height;
-
-            while (true)
+            if(type == "student")
             {
-                Connecter.messageToRecieve = Connecter.socket.ReceiveMultipartMessage();
-                var content = Encoding.UTF8.GetString(Connecter.messageToRecieve[0].Buffer);
-
-                JObject jsonContent = JObject.Parse(content);
-
-                if (jsonContent.ContainsKey("ticket") && jsonContent.ContainsKey("name"))// && jsonContent.ContainsKey("serverid"))
+                try
                 {
-                    Connecter.currentPlace = jsonContent.GetValue("ticket").ToString();
+                    TBStudentQueue.Invoke((MethodInvoker)(() => TBStudentQueue.Text = "---Current Student Queue--- \n " + stringToAdd));
                 }
-                else if (jsonContent.ContainsKey("queue"))
+                catch (Exception e)
                 {
-                    extractQueue(jsonContent, "student");
-                }
-                else if (jsonContent.ContainsKey("remove"))
-                {
-                    popupForm.Text = "Message from Supervisor";
-                    popupFormText.Text = jsonContent.GetValue("remove").ToString();
-                    popupFormText.ReadOnly = true;
-                    popupForm.Controls.Add(popupFormText);
-                    popupForm.Show(this);
-                }
-                else if(jsonContent.Count == 1)
-                {
-                    string heartbeat = "{}";
-                    SendMessage(heartbeat);
-                    System.Diagnostics.Debug.WriteLine("updates queue");
+                    System.Diagnostics.Debug.WriteLine(e.Message);
                 }
             }
-        }
-
-        public void changeTextBox(string stringToAdd)
-        {
-            TBStudentQueue.Invoke((MethodInvoker)(() => TBStudentQueue.Text = "---Current Student Queue--- \n " + stringToAdd));
-
-            foreach (string s in studentQueue)
+            else if(type == "supervisor")
             {
-                System.Diagnostics.Debug.WriteLine(s);
+                try
+                {
+                    TBSupervisorQueue.Invoke((MethodInvoker)(() => TBStudentQueue.Text = "---Current Student Queue--- \n " + stringToAdd));
+                }
+                catch (Exception e)
+                {
+                    System.Diagnostics.Debug.WriteLine(e.Message);
+                }
             }
         }
 
         public void clearTextBox()
         {
-            TBStudentQueue.Invoke((MethodInvoker)(() => TBStudentQueue.Text = ""));
+            TBStudentQueue.Invoke((MethodInvoker)(() => TBStudentQueue.Text = "---Current Student Queue---"));
         }
 
         public void extractQueue(JObject Jmessage, string type)
         {
             if (Jmessage.ContainsKey("queue") && type == "student")
             {
-                System.Diagnostics.Debug.WriteLine("updates queue 2 from within type == student");
                 currentStudentQueue = "";
                 studentQueue.Clear();
 
@@ -203,13 +238,15 @@ namespace Client
             }
             else if (type == "supervisor")
             {
-                supervisorList.Clear();
                 currentSupervisorQueue = "";
+                supervisorList.Clear();
 
                 foreach (var x in Jmessage.GetValue("supervisor"))
                 {
                     supervisorList.Add(x["name"].ToString() + " ");
-                    supervisorList.Add(x["status"].ToString() + " \n ");
+                    supervisorList.Add(x["status"].ToString() + " ");
+                    supervisorList.Add(x["client"].ToString() + " ");
+                    supervisorList.Add(x["clientMessage"].ToString() + " \n ");
                 }
 
                 foreach (var x in supervisorList)
@@ -217,20 +254,47 @@ namespace Client
                     currentSupervisorQueue += x;
                 }
             }
-
         }
-
         public void UpdateQueueGUI()
         {
             currentStudentQueue = "";
             Thread.Sleep(3000);
             while (true)
             {
-                if (lastKnownStudentQueue != currentStudentQueue && isInQueue)
+                Thread.Sleep(1000);
+                if (isInQueue)
                 {
-                    changeTextBox(currentStudentQueue);
+                    changeTextBox(currentStudentQueue, "student");
+                    changeTextBox(currentSupervisorQueue, "supervisor");
                     lastKnownStudentQueue = currentStudentQueue;
                 }
+                else if (!isInQueue)
+                {
+                    changeTextBox("", "student");
+                    changeTextBox("", "supervisor");
+                }
+            }
+        }
+
+        private void BtnEnterQueue_Click(object sender, EventArgs e)
+        {
+            if (FetchInfo())
+            {
+                string enterQueueTicket = "{\"enterQueue\":true,\"name\":\"" + username + "\"}";
+                SendMessage(enterQueueTicket);
+                //    string attendTicket = "{\"attend\":true,\"name\":\"" + username + "\"}";
+                //   SendMessage(attendTicket);
+            }
+        }
+
+        private void BtnSubscribe_Click(object sender, EventArgs e)
+        {
+            if (FetchInfo())
+            {
+                string subscribeToQueue = "{\"subscribe\":true}";
+                SendMessage(subscribeToQueue);
+                isInQueue = true;
+                lastKnownStudentQueue = "";
             }
         }
 
@@ -238,13 +302,17 @@ namespace Client
         {
             if (isConnected)
             {
-                Thread.Sleep(500);
                 string RemovesubscribeToQueue = "{\"subscribe\":false}";
                 SendMessage(RemovesubscribeToQueue);
                 clearTextBox();
                 currentStudentQueue = "";
                 isInQueue = false;
             }
+        }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            Application.Exit();
         }
     }
 }

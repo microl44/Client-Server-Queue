@@ -42,6 +42,7 @@
             this.richTextBoxMessageToSend = new System.Windows.Forms.RichTextBox();
             this.RemoveFromQueue = new System.Windows.Forms.Button();
             this.SendMessageToFirst = new System.Windows.Forms.Button();
+            this.button3 = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // button1
@@ -51,7 +52,7 @@
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(371, 32);
             this.button1.TabIndex = 4;
-            this.button1.Text = "Connect To Server";
+            this.button1.Text = "Attend Server As Supervisor";
             this.button1.UseVisualStyleBackColor = true;
             this.button1.Click += new System.EventHandler(this.BtnEnterQueue_Click);
             // 
@@ -91,7 +92,7 @@
             this.button2.Name = "button2";
             this.button2.Size = new System.Drawing.Size(371, 32);
             this.button2.TabIndex = 5;
-            this.button2.Text = "Subscribe To Queue";
+            this.button2.Text = "Subscribe to Queue";
             this.button2.UseVisualStyleBackColor = true;
             this.button2.Click += new System.EventHandler(this.BtnSubscribe_Click);
             // 
@@ -186,11 +187,23 @@
             this.SendMessageToFirst.UseVisualStyleBackColor = true;
             this.SendMessageToFirst.Click += new System.EventHandler(this.BtnSendMessageToFirst);
             // 
+            // button3
+            // 
+            this.button3.Location = new System.Drawing.Point(747, 7);
+            this.button3.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
+            this.button3.Name = "button3";
+            this.button3.Size = new System.Drawing.Size(95, 17);
+            this.button3.TabIndex = 67;
+            this.button3.Text = "Exit";
+            this.button3.UseVisualStyleBackColor = true;
+            this.button3.Click += new System.EventHandler(this.button3_Click);
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(850, 421);
+            this.Controls.Add(this.button3);
             this.Controls.Add(this.SendMessageToFirst);
             this.Controls.Add(this.RemoveFromQueue);
             this.Controls.Add(this.richTextBoxMessageToSend);
@@ -230,5 +243,6 @@
         public System.Windows.Forms.RichTextBox richTextBoxMessageToSend;
         private System.Windows.Forms.Button RemoveFromQueue;
         private System.Windows.Forms.Button SendMessageToFirst;
+        private System.Windows.Forms.Button button3;
     }
 }

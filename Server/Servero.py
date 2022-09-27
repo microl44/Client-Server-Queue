@@ -92,7 +92,7 @@ def protocol_Attend(client_id, message_dict):
             # Update clients on status
             updateStatus = True
             # Add supervisor client to list
-            supervisorList.append([client_id, message_dict['name'], 'available', '', '']) 
+            supervisorList.append([client_id.decode("utf-8"), message_dict['name'], 'available', '', '']) 
             #Log
             print('\tServer: First supervisor added to class...\n')
             print(supervisorList)

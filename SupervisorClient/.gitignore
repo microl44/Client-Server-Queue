@@ -7,3 +7,4 @@ SupervisorClient.csproj
 SupervisorClient.csproj.user
 SupervisorClient.sln
 .vs
+.vs/*

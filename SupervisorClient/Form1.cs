@@ -58,6 +58,7 @@ namespace SupervisorClient
             public static NetMQMessage messageToSend;
             public static NetMQMessage messageToRecieve;
             public static NetMQRuntime asyncSocket;
+            public static System.Timers.Timer timer = new System.Timers.Timer(interval: 5000);
 
             public static string currentPlace;
             public static string textBoxText;
@@ -119,6 +120,7 @@ namespace SupervisorClient
                             firstMessage = false;
                         }
                         extractQueue(jsonContent, "student");
+                        extractQueue(jsonContent, "supervisor");
                     }
                     else if (jsonContent.ContainsKey("message") && jsonContent.ContainsKey("serverId"))
                     {
@@ -138,9 +140,19 @@ namespace SupervisorClient
 
         public void ShowMessage(string windowTitle, string message)
         {
+            Form popupForm = new Form();
+            RichTextBox popupFormText = new RichTextBox();
+            popupFormText.Width = popupForm.Width - 5;
+            popupFormText.Height = popupForm.Height;
+
+            popupForm.Text = windowTitle;
+            popupFormText.Text = message;
+            popupFormText.ReadOnly = true;
+            popupForm.Controls.Add(popupFormText);
+            popupForm.Show();
         }
 
-        public bool FetchInfo()
+        public bool CreateConnection()
         {
             if(isConnected)
             {
@@ -196,7 +208,6 @@ namespace SupervisorClient
         {
             if (Jmessage.ContainsKey("queue") && type == "student")
             {
-                System.Diagnostics.Debug.WriteLine("updates queue 2 from within type == student");
                 currentStudentQueue = "";
                 studentQueue.Clear();
 
@@ -213,13 +224,15 @@ namespace SupervisorClient
             }
             else if (type == "supervisor")
             {
-                supervisorList.Clear();
                 currentSupervisorQueue = "";
+                supervisorList.Clear();
 
                 foreach (var x in Jmessage.GetValue("supervisor"))
                 {
                     supervisorList.Add(x["name"].ToString() + " ");
-                    supervisorList.Add(x["status"].ToString() + " \n ");
+                    supervisorList.Add(x["status"].ToString() + " ");
+                    supervisorList.Add(x["client"].ToString() + " ");
+                    supervisorList.Add(x["clientMessage"].ToString() + " \n ");
                 }
 
                 foreach (var x in supervisorList)
@@ -249,16 +262,16 @@ namespace SupervisorClient
 
         private void BtnEnterQueue_Click(object sender, EventArgs e)
         {
-            if (FetchInfo())
+            if (CreateConnection())
             {
-                string enterQueueTicket = "{\"enterQueue\":true,\"name\":\"" + username + "\"}";
-                SendMessage(enterQueueTicket);
+                string attendTicket = "{\"attend\":true,\"name\":\"" + username + "\"}";
+                SendMessage(attendTicket);
             }
         }
 
         private void BtnSubscribe_Click(object sender, EventArgs e)
         {
-            if (FetchInfo())
+            if (CreateConnection())
             {
                 string subscribeToQueue = "{\"subscribe\":true}";
                 SendMessage(subscribeToQueue);
@@ -281,10 +294,10 @@ namespace SupervisorClient
 
         private void BtnRemoveFirst(object sender, EventArgs e)
         {
-            if (FetchInfo())
+            if (CreateConnection())
             {
                 string message = richTextBoxMessageToSend.Text;
-                string enterQueueTicket = "{\"remove\":true,\"message\":\"" + message + "\"}";
+                string enterQueueTicket = "{\"remove\":false,\"name:\"" + username + "\", message\":\"" + message + "\"}";
                 SendMessage(enterQueueTicket);
             }
         }
@@ -296,18 +309,23 @@ namespace SupervisorClient
             popupFormText2.Width = popupForm2.Width - 5;
             popupFormText2.Height = popupForm2.Height;
 
-            popupForm2.Text = "asdadsasdasdasd";
-            popupFormText2.Text = "fghdfghdfgh";
+            popupForm2.Text = "Message from supervisor";
+            popupFormText2.Text = richTextBoxMessageToSend.Text;
             popupFormText2.ReadOnly = true;
             popupForm2.Controls.Add(popupFormText2);
             popupForm2.Show(this);
 
-            if (FetchInfo())
+            if (CreateConnection())
             {
                 string message = richTextBoxMessageToSend.Text;
-                string enterQueueTicket = "{\"remove\":false,\"message\":\"" + message + "\"}";
+                string enterQueueTicket = "{\"remove\":false,\"name:\"" + username + "\", message\":\"" + message + "\"}";
                 SendMessage(enterQueueTicket);
             }
+        }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            Application.Exit();
         }
     }
 }
