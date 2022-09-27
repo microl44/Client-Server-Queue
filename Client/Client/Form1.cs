@@ -27,10 +27,12 @@ namespace Client
         private static string ip;
         private static string port;
         private static string username;
+        private static string lastAdminMessage;
 
         private static bool isConnected;
         private static bool isInQueue = false;
         private static bool firstMessage = true;
+
         public Form1()
         {
             InitializeComponent();
@@ -63,10 +65,7 @@ namespace Client
 
         public void ThreadWork()
         {
-            Form popupForm2 = new Form();
-            RichTextBox popupFormText2 = new RichTextBox();
-            popupFormText2.Width = popupForm2.Width - 5;
-            popupFormText2.Height = popupForm2.Height;
+
             while (true)
             {
                 try
@@ -120,10 +119,9 @@ namespace Client
                         extractQueue(jsonContent, "student");
                         extractQueue(jsonContent, "supervisor");
                     }
-                    else if (jsonContent.ContainsKey("name") && jsonContent.ContainsKey("message") && jsonContent.ContainsKey("serverId"))
+                    else if (jsonContent.ContainsKey("name") && jsonContent.ContainsKey("clientMessage") && jsonContent.ContainsKey("serverId"))
                     {
-                        System.Diagnostics.Debug.WriteLine("Message from admin recieved!");
-                        ShowMessage("Message from Supervisor", jsonContent.GetValue("clientMessage").ToString());
+                        lastAdminMessage = jsonContent.GetValue("clientMessage").ToString();
                     }
                 }
                 catch (Exception e)
@@ -214,12 +212,18 @@ namespace Client
                     System.Diagnostics.Debug.WriteLine(e.Message);
                 }
             }
+            else if (type == "admin_message")
+            {
+                System.Diagnostics.Debug.WriteLine("admin message box updates to: " + stringToAdd);
+                TBAdminMessage.Invoke((MethodInvoker)(() => TBAdminMessage.Text = "---Last Admin Message--- \n " + stringToAdd));
+            }
         }
 
         public void clearTextBox()
         {
             TBStudentQueue.Invoke((MethodInvoker)(() => TBStudentQueue.Text = "---Current Student Queue---"));
             TBSupervisorQueue.Invoke((MethodInvoker)(() => TBSupervisorQueue.Text = "---Current Supervisors---"));
+            TBAdminMessage.Invoke((MethodInvoker)(() => TBAdminMessage.Text = "---Last Admin Message--"));
         }
 
         public void extractQueue(JObject Jmessage, string type)
@@ -249,8 +253,8 @@ namespace Client
                 {
                     supervisorList.Add(x["name"].ToString() + " ");
                     supervisorList.Add(x["status"].ToString() + " ");
-                    supervisorList.Add(x["client"].ToString() + " ");
-                    supervisorList.Add(x["clientMessage"].ToString() + " \n ");
+                    //supervisorList.Add(x["client"].ToString() + " ");
+                    //supervisorList.Add(x["clientMessage"].ToString() + " \n ");
                 }
 
                 foreach (var x in supervisorList)
@@ -269,6 +273,10 @@ namespace Client
                 {
                     changeTextBox(currentStudentQueue, "student");
                     changeTextBox(currentSupervisorQueue, "supervisor");
+                    if(lastAdminMessage != "")
+                    {
+                        changeTextBox(lastAdminMessage, "admin_message");
+                    }
                 }
                 else if (!isInQueue)
                 {

@@ -39,6 +39,7 @@
             this.label3 = new System.Windows.Forms.Label();
             this.TBPort = new System.Windows.Forms.TextBox();
             this.TBSupervisorQueue = new System.Windows.Forms.RichTextBox();
+            this.TBAdminMessage = new System.Windows.Forms.RichTextBox();
             this.SuspendLayout();
             // 
             // button1
@@ -61,28 +62,16 @@
             this.textBox1.TabIndex = 1;
             // 
             // TBStudentQueue
-            //
+            // 
             this.TBStudentQueue.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
             this.TBStudentQueue.Location = new System.Drawing.Point(432, 33);
             this.TBStudentQueue.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
             this.TBStudentQueue.Name = "TBStudentQueue";
-            this.TBStudentQueue.Size = new System.Drawing.Size(410, 187);
+            this.TBStudentQueue.Size = new System.Drawing.Size(297, 187);
             this.TBStudentQueue.TabIndex = 7;
             this.TBStudentQueue.TabStop = false;
             this.TBStudentQueue.Text = "---Current Student Queue---";
             // 
-            // TBSupervisorQueue
-            // 
-            this.TBSupervisorQueue.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            this.TBSupervisorQueue.Location = new System.Drawing.Point(430, 228);
-            this.TBSupervisorQueue.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
-            this.TBSupervisorQueue.Name = "TBSupervisorQueue";
-            this.TBSupervisorQueue.ReadOnly = true;
-            this.TBSupervisorQueue.Size = new System.Drawing.Size(410, 178);
-            this.TBSupervisorQueue.TabIndex = 8;
-            this.TBSupervisorQueue.TabStop = false;
-            this.TBSupervisorQueue.Text = "---Current Supervisors---";
-            //
             // label1
             // 
             this.label1.AutoSize = true;
@@ -151,11 +140,34 @@
             this.TBPort.Size = new System.Drawing.Size(245, 23);
             this.TBPort.TabIndex = 3;
             // 
+            // TBSupervisorQueue
+            // 
+            this.TBSupervisorQueue.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.TBSupervisorQueue.Location = new System.Drawing.Point(430, 228);
+            this.TBSupervisorQueue.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
+            this.TBSupervisorQueue.Name = "TBSupervisorQueue";
+            this.TBSupervisorQueue.ReadOnly = true;
+            this.TBSupervisorQueue.Size = new System.Drawing.Size(299, 178);
+            this.TBSupervisorQueue.TabIndex = 8;
+            this.TBSupervisorQueue.TabStop = false;
+            this.TBSupervisorQueue.Text = "---Current Supervisors---";
+            // 
+            // TBAdminMessage
+            // 
+            this.TBAdminMessage.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.TBAdminMessage.Location = new System.Drawing.Point(737, 33);
+            this.TBAdminMessage.Name = "TBAdminMessage";
+            this.TBAdminMessage.Size = new System.Drawing.Size(357, 376);
+            this.TBAdminMessage.TabIndex = 10;
+            this.TBAdminMessage.TabStop = false;
+            this.TBAdminMessage.Text = "---Last Admin Message---";
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(850, 421);
+            this.ClientSize = new System.Drawing.Size(1106, 421);
+            this.Controls.Add(this.TBAdminMessage);
             this.Controls.Add(this.TBPort);
             this.Controls.Add(this.label3);
             this.Controls.Add(this.TBIP);
@@ -188,5 +200,6 @@
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.TextBox TBPort;
         public System.Windows.Forms.RichTextBox TBSupervisorQueue;
+        private System.Windows.Forms.RichTextBox TBAdminMessage;
     }
 }

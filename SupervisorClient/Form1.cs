@@ -64,10 +64,6 @@ namespace SupervisorClient
 
         public void ThreadWork()
         {
-            Form popupForm2 = new Form();
-            RichTextBox popupFormText2 = new RichTextBox();
-            popupFormText2.Width = popupForm2.Width - 5;
-            popupFormText2.Height = popupForm2.Height;
             while (true)
             {
                 try
