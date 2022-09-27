@@ -234,7 +234,7 @@ def protocol_Remove(message_dict):
                         super['client'] = student_ticket
                         super['clientMessage'] = message_dict['message']
                         # Construct message for response 
-                        student_message = {'name': message_dict['name'], 'message': message_dict['message'], 'serverId': serverId}
+                        student_message = {'name': message_dict['name'], 'clientMessage': message_dict['message'], 'serverId': serverId}
                         message_response = json.dumps(student_message)
                         # Encode message
                         message_response = str.encode(message_response)
@@ -256,7 +256,7 @@ def protocol_Remove(message_dict):
                         super['client'] = student_ticket
                         super['clientMessage'] = message_dict['message']
                         # Construct message for response 
-                        student_message = {'name': message_dict['name'], 'message': message_dict['message'], 'serverId': serverId}
+                        student_message = {'name': message_dict['name'], 'clientMessage': message_dict['message'], 'serverId': serverId}
                         message_response = json.dumps(student_message)
                         # Encode message
                         message_response = str.encode(message_response)
