@@ -18,7 +18,6 @@ namespace Client
 {
     public partial class Form1 : Form
     {
-        private static string lastKnownStudentQueue = "UNK";
         private static string currentStudentQueue = "";
         private static string currentSupervisorQueue = "";
         private static List<string> serverList = new List<string>();
@@ -94,6 +93,7 @@ namespace Client
                         continue;
                     }
 
+                    System.Diagnostics.Debug.WriteLine("Not a heartbeat, continues in threadwork.");
                     // if message is ticket response, add serverId to list of servers and update the users current place.
                     if (jsonContent.ContainsKey("ticket") && jsonContent.ContainsKey("name") && jsonContent.ContainsKey("serverId"))
                     {
@@ -118,10 +118,11 @@ namespace Client
                             firstMessage = false;
                         }
                         extractQueue(jsonContent, "student");
-                        //extractQueue(jsonContent, "supervisor");
+                        extractQueue(jsonContent, "supervisor");
                     }
-                    else if (jsonContent.ContainsKey("message") && jsonContent.ContainsKey("serverId"))
+                    else if (firstMessage == false && jsonContent.ContainsKey("name") && jsonContent.ContainsKey("message") && jsonContent.ContainsKey("serverId"))
                     {
+                        System.Diagnostics.Debug.WriteLine("Message from admin recieved!");
                         ShowMessage("Message from Supervisor", jsonContent.GetValue("message").ToString());
                     }
                 }
@@ -189,10 +190,11 @@ namespace Client
         }
         public void changeTextBox(string stringToAdd, string type)
         {
-            if(type == "student")
+            if (type == "student")
             {
                 try
                 {
+                    System.Diagnostics.Debug.WriteLine("Student box updates to: " + stringToAdd);
                     TBStudentQueue.Invoke((MethodInvoker)(() => TBStudentQueue.Text = "---Current Student Queue--- \n " + stringToAdd));
                 }
                 catch (Exception e)
@@ -200,11 +202,12 @@ namespace Client
                     System.Diagnostics.Debug.WriteLine(e.Message);
                 }
             }
-            else if(type == "supervisor")
+            else if (type == "supervisor")
             {
                 try
                 {
-                    TBSupervisorQueue.Invoke((MethodInvoker)(() => TBStudentQueue.Text = "---Current Student Queue--- \n " + stringToAdd));
+                    System.Diagnostics.Debug.WriteLine("supervisors box updates to: " + stringToAdd);
+                    TBSupervisorQueue.Invoke((MethodInvoker)(() => TBSupervisorQueue.Text = "---Current Supervisors--- \n " + stringToAdd));
                 }
                 catch (Exception e)
                 {
@@ -216,6 +219,7 @@ namespace Client
         public void clearTextBox()
         {
             TBStudentQueue.Invoke((MethodInvoker)(() => TBStudentQueue.Text = "---Current Student Queue---"));
+            TBSupervisorQueue.Invoke((MethodInvoker)(() => TBSupervisorQueue.Text = "---Current Supervisors---"));
         }
 
         public void extractQueue(JObject Jmessage, string type)
@@ -236,12 +240,12 @@ namespace Client
                     currentStudentQueue += s;
                 }
             }
-            else if (type == "supervisor")
+            else if (Jmessage.ContainsKey("supervisors") && type == "supervisor")
             {
                 currentSupervisorQueue = "";
                 supervisorList.Clear();
 
-                foreach (var x in Jmessage.GetValue("supervisor"))
+                foreach (var x in Jmessage.GetValue("supervisors"))
                 {
                     supervisorList.Add(x["name"].ToString() + " ");
                     supervisorList.Add(x["status"].ToString() + " ");
@@ -257,8 +261,7 @@ namespace Client
         }
         public void UpdateQueueGUI()
         {
-            currentStudentQueue = "";
-            Thread.Sleep(3000);
+            Thread.Sleep(1000);
             while (true)
             {
                 Thread.Sleep(1000);
@@ -266,7 +269,6 @@ namespace Client
                 {
                     changeTextBox(currentStudentQueue, "student");
                     changeTextBox(currentSupervisorQueue, "supervisor");
-                    lastKnownStudentQueue = currentStudentQueue;
                 }
                 else if (!isInQueue)
                 {
@@ -282,8 +284,6 @@ namespace Client
             {
                 string enterQueueTicket = "{\"enterQueue\":true,\"name\":\"" + username + "\"}";
                 SendMessage(enterQueueTicket);
-                //    string attendTicket = "{\"attend\":true,\"name\":\"" + username + "\"}";
-                //   SendMessage(attendTicket);
             }
         }
 
@@ -294,7 +294,6 @@ namespace Client
                 string subscribeToQueue = "{\"subscribe\":true}";
                 SendMessage(subscribeToQueue);
                 isInQueue = true;
-                lastKnownStudentQueue = "";
             }
         }
 
@@ -305,14 +304,8 @@ namespace Client
                 string RemovesubscribeToQueue = "{\"subscribe\":false}";
                 SendMessage(RemovesubscribeToQueue);
                 clearTextBox();
-                currentStudentQueue = "";
                 isInQueue = false;
             }
-        }
-
-        private void button3_Click(object sender, EventArgs e)
-        {
-            Application.Exit();
         }
     }
 }
