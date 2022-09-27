@@ -58,7 +58,7 @@ def protocol_Heartbeat():
                     print('\tServer: Timeout for student client...\n')
             # Dead subscribers
             for sub in subsQueue:
-                if dead == subsQueue:
+                if dead in subsQueue:
                     # Update all clients
                     updateStatus = True
                     subsQueue.remove(sub)
