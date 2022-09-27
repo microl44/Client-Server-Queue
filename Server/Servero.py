@@ -5,19 +5,20 @@ import time
 import json
 import threading
 
-serverId = '1'
 subsQueue = []
 studentQueue = []
+supervisorIDs = []
 supervisorList  = []
 ticketQueue = []
 clientIDsList = []
 heartbeatList = []
+serverId = '1'
 t = 15
 port = 5555
 
 def protocol_Heartbeat():
     # Global
-    global heartbeatList, clientIDsList, serverId, updateStatus, socket, t
+    global heartbeatList, clientIDsList, supervisorIDs, serverId, updateStatus, socket, t
     # Unstoppable loop
     while True:
         # Iterate through all clients and send a heartbeat message
@@ -43,7 +44,6 @@ def protocol_Heartbeat():
             # No response from client at all
             elif c not in heartbeatList:
                 deadClients.append(c)
-        
         # Check remaining list with clients due to timeout
         for dead in deadClients:
             # Dead students
@@ -64,16 +64,20 @@ def protocol_Heartbeat():
                     subsQueue.remove(sub)
                     print('\tServer: Timeout for subscribed client...\n')
             # Dead supervisors
-            for supervisor in supervisorList:
+            for supervisor in supervisorIDs:
                 if dead in supervisor:
-                    updateStatus = True
-                    supervisorList.remove(supervisor)
-                    print('\tServer: Timeout for supervisor client...\n')
+                    # Find correct name on supervisor with dead ID
+                    for super in supervisorList:
+                        if supervisor[1] == super['name']:
+                            updateStatus = True
+                            supervisorList.remove(super)
+                            supervisorIDs.remove(supervisor)
+                            print('\tServer: Timeout for supervisor client...\n')
 
         clientIDsList = aliveClients
         heartbeatList = []
 
-def protocol_Attend(message_dict):
+def protocol_Attend(client_id, message_dict):
     # Global
     global updateStatus, supervisorList
     # Check if supervisor client wants to join class
@@ -83,6 +87,7 @@ def protocol_Attend(message_dict):
             updateStatus = True
             # Add supervisor client to list
             supervisorList.append({'name':message_dict['name'], 'status':'available', 'client':'', 'clientMessage':''}) 
+            supervisorIDs.append([client_id, message_dict['name']])
             print('\tServer: First supervisor added to class...\n')
         else:
             match_name = False
@@ -97,10 +102,11 @@ def protocol_Attend(message_dict):
                 updateStatus = True
                 # Add supervisor client to list
                 supervisorList.append({'name':message_dict['name'], 'status':'available', 'client':'', 'clientMessage':''})
+                supervisorIDs.append([client_id, message_dict['name']])
                 print('\tServer: Supervisor is added to class...\n')  
          
     elif not message_dict['attend']:
-        # If no supervisor
+        # If no supervisors
         if not supervisorList:
             print('\tServer: No supervisor attending class...\n')
         else:
@@ -110,6 +116,7 @@ def protocol_Attend(message_dict):
                     updateStatus = True
                     # Remove  supervisor
                     supervisorList.pop(supervisorList.index(supervisor))
+                    supervisorIDs.pop(supervisorList.index(supervisor))
                     print('\tServer: A supervisor has left class...\n')
                         
 def protocol_EnterQueue(client_id, message_dict):
@@ -322,7 +329,7 @@ print('Configuring server... Please wait...')
 heartThread = threading.Thread(target=protocol_Heartbeat)
 heartThread.start()
 
-print('Server is upp and running...')
+print('Server is up and running...')
 
 while True:
     # Variable to tell if need exist to update all subscribed clients, false at start
@@ -343,13 +350,12 @@ while True:
     if 'attend' in messageDict:
         if clientID not in heartbeatList:
             heartbeatList.append(clientID)   
-        protocol_Attend(messageDict)
+        protocol_Attend(clientID, messageDict)
         
     if 'enterQueue' in messageDict:
         if clientID not in heartbeatList:
             heartbeatList.append(clientID)   
         protocol_EnterQueue(clientID, messageDict)
-        print(ticketQueue)
 
     if 'subscribe' in messageDict:
         if clientID not in heartbeatList:
