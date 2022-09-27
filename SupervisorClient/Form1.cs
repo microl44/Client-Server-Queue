@@ -327,17 +327,6 @@ namespace SupervisorClient
 
         private void BtnSendMessageToFirst(object sender, EventArgs e)
         {
-            Form popupForm2 = new Form();
-            RichTextBox popupFormText2 = new RichTextBox();
-            popupFormText2.Width = popupForm2.Width - 5;
-            popupFormText2.Height = popupForm2.Height;
-
-            popupForm2.Text = "Message from supervisor";
-            popupFormText2.Text = richTextBoxMessageToSend.Text;
-            popupFormText2.ReadOnly = true;
-            popupForm2.Controls.Add(popupFormText2);
-            popupForm2.Show(this);
-
             if (CreateConnection())
             {
                 string message = richTextBoxMessageToSend.Text;
