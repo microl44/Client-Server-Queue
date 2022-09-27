@@ -44,6 +44,8 @@ namespace Client
             TBStudentQueue.ReadOnly = true;
             TBStudentQueue.ShortcutsEnabled = false;
 
+            serverList.Add("temp");
+
             Thread doSomething = new Thread(() => ThreadWork());
             doSomething.Start();
 
@@ -96,6 +98,7 @@ namespace Client
                     // if message is ticket response, add serverId to list of servers and update the users current place.
                     if (jsonContent.ContainsKey("ticket") && jsonContent.ContainsKey("name") && jsonContent.ContainsKey("serverId"))
                     {
+                        serverList.Remove("temp");
                         if (firstMessage)
                         {
                             if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
@@ -108,8 +111,10 @@ namespace Client
                     }
                     else if (jsonContent.ContainsKey("queue") && jsonContent.ContainsKey("supervisors") && jsonContent.ContainsKey("serverId"))
                     {
+                        serverList.Remove("temp");
                         if (firstMessage)
                         {
+
                             if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
                             {
                                 serverList.Add(jsonContent.GetValue("serverId").ToString());
@@ -192,7 +197,6 @@ namespace Client
             {
                 try
                 {
-                    System.Diagnostics.Debug.WriteLine("Student box updates to: " + stringToAdd);
                     TBStudentQueue.Invoke((MethodInvoker)(() => TBStudentQueue.Text = "---Current Student Queue--- \n " + stringToAdd));
                 }
                 catch (Exception e)
@@ -204,7 +208,6 @@ namespace Client
             {
                 try
                 {
-                    System.Diagnostics.Debug.WriteLine("supervisors box updates to: " + stringToAdd);
                     TBSupervisorQueue.Invoke((MethodInvoker)(() => TBSupervisorQueue.Text = "---Current Supervisors--- \n " + stringToAdd));
                 }
                 catch (Exception e)
@@ -214,7 +217,6 @@ namespace Client
             }
             else if (type == "admin_message")
             {
-                System.Diagnostics.Debug.WriteLine("admin message box updates to: " + stringToAdd);
                 TBAdminMessage.Invoke((MethodInvoker)(() => TBAdminMessage.Text = "---Last Admin Message--- \n " + stringToAdd));
             }
         }
@@ -253,7 +255,14 @@ namespace Client
                 {
                     supervisorList.Add(x["name"].ToString() + " ");
                     supervisorList.Add(x["status"].ToString() + " ");
-                    //supervisorList.Add(x["client"].ToString() + " ");
+
+                    if (x["status"].ToString() == "")
+                    {
+                        foreach (var y in Jmessage.GetValue("supervisors"))
+                        {
+                            supervisorList.Add(y["name"].ToString() + " ");
+                        }
+                    }
                     //supervisorList.Add(x["clientMessage"].ToString() + " \n ");
                 }
 

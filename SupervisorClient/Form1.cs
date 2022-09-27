@@ -13,6 +13,7 @@ using System.Threading;
 using System.Text.Json;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Timers;
 
 namespace SupervisorClient
 {
@@ -32,6 +33,8 @@ namespace SupervisorClient
         private static bool isConnected;
         private static bool isInQueue = false;
         private static bool firstMessage = true;
+
+        private DateTime lastCalled;
         public Form1()
         {
             InitializeComponent();
@@ -42,6 +45,8 @@ namespace SupervisorClient
 
             TBStudentQueue.ReadOnly = true;
             TBStudentQueue.ShortcutsEnabled = false;
+
+            serverList.Add("temp");
 
             Thread doSomething = new Thread(() => ThreadWork());
             doSomething.Start();
@@ -68,6 +73,7 @@ namespace SupervisorClient
             {
                 try
                 {
+                    
                     // Recieve multipart message, encode and store into variable, parse message to json object.
                     Connecter.messageToRecieve = Connecter.socket.ReceiveMultipartMessage();
                     var content = Encoding.UTF8.GetString(Connecter.messageToRecieve[0].Buffer);
@@ -93,26 +99,31 @@ namespace SupervisorClient
                     // if message is ticket response, add serverId to list of servers and update the users current place.
                     if (jsonContent.ContainsKey("ticket") && jsonContent.ContainsKey("name") && jsonContent.ContainsKey("serverId"))
                     {
-                        if (firstMessage)
+                        if(firstMessage)
                         {
-                            if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
-                            {
-                                serverList.Add(jsonContent.GetValue("serverId").ToString());
-                            }
-                            firstMessage = false;
+                            serverList.Remove("temp");
                         }
+                        if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
+                        {
+                            serverList.Add(jsonContent.GetValue("serverId").ToString());
+                        }
+
+                        firstMessage = false;
                         Connecter.currentPlace = jsonContent.GetValue("ticket").ToString();
                     }
                     else if (jsonContent.ContainsKey("queue") && jsonContent.ContainsKey("supervisors") && jsonContent.ContainsKey("serverId"))
                     {
                         if (firstMessage)
                         {
-                            if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
-                            {
-                                serverList.Add(jsonContent.GetValue("serverId").ToString());
-                            }
-                            firstMessage = false;
+                            serverList.Remove("temp");
                         }
+                        if (!serverList.Contains(jsonContent.GetValue("serverId").ToString()))
+                        {
+                            serverList.Add(jsonContent.GetValue("serverId").ToString());
+                        }
+
+                        firstMessage = false;
+
                         extractQueue(jsonContent, "student");
                         extractQueue(jsonContent, "supervisor");
                     }
@@ -127,6 +138,12 @@ namespace SupervisorClient
         public void SendMessage(string MessageToSend)
         {
             Connecter.socket.SendFrame(MessageToSend);
+        }
+
+        public void ThrowError()
+        {
+            TBStudentQueue.Invoke((MethodInvoker)(() => TBSupervisorQueue.Text = "FATAL ERROR HAS OCCURRED \n CONNECTION TO SERVER TIMED OUT"));
+            TBSupervisorQueue.Invoke((MethodInvoker)(() => TBSupervisorQueue.Text = "FATAL ERROR HAS OCCURRED \n CONNECTION TO SERVER TIMED OUT"));
         }
 
         public void ShowMessage(string windowTitle, string message)
@@ -173,7 +190,6 @@ namespace SupervisorClient
 
                 Connecter.socket.Connect("tcp://" + ip + ":" + port);
                 isConnected = true;
-                serverList.Add("temp");
 
                 return true;
             }
@@ -237,7 +253,14 @@ namespace SupervisorClient
                 {
                     supervisorList.Add(x["name"].ToString() + " ");
                     supervisorList.Add(x["status"].ToString() + " ");
-                    supervisorList.Add(x["client"].ToString() + " ");
+
+                    if(x["status"].ToString( )== "")
+                    {
+                        foreach (var y in Jmessage.GetValue("supervisors"))
+                        {
+                            supervisorList.Add(y["name"].ToString() + " ");
+                        }
+                    }
                     //supervisorList.Add(x["clientMessage"].ToString() + " \n ");
                 }
 

@@ -130,6 +130,7 @@ def protocol_EnterQueue(client_id, message_dict):
     if message_dict['enterQueue']:
         # If first student client to join
         if not studentQueue:
+            updateStatus = True
             # Add first student
             studentQueue.append([client_id, message_dict['name']])     
             # Construct message for response
