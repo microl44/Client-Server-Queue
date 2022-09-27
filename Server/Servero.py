@@ -5,7 +5,7 @@ import time
 import json
 import threading
 
-serverId = '12345'
+serverId = '1'
 subsQueue = []
 studentQueue = []
 supervisorList  = []
@@ -13,6 +13,7 @@ ticketQueue = []
 clientIDsList = []
 heartbeatList = []
 t = 15
+port = 5555
 
 def protocol_Heartbeat():
     # Global
@@ -121,9 +122,10 @@ def protocol_EnterQueue(client_id, message_dict):
             # Add first student
             studentQueue.append([client_id, message_dict['name']])     
             # Construct message for response
-            ticketDict = {'ticket': 1, 'name': message_dict['name'], 'serverId': serverId}
+            ticketDict = {'ticket': 1, 'name': message_dict['name']}
+            message_ticket = {'ticket': 1, 'name': message_dict['name'], 'serverId': serverId}
             ticketQueue.append(ticketDict)
-            message_response = json.dumps(ticketDict)
+            message_response = json.dumps(message_ticket)
             # Encode message
             message_response = str.encode(message_response)
             # Send response to student
@@ -143,6 +145,7 @@ def protocol_EnterQueue(client_id, message_dict):
                         # Get the student's ticket and resend if name matches
                         student_ticket = ticketQueue[studentQueue.index(student)]
                         if student_ticket['name'] in student:
+                            student_ticket['serverId'] = serverId
                             # Construct message for response
                             message_response = json.dumps(student_ticket)
                             # Encode message
@@ -157,10 +160,11 @@ def protocol_EnterQueue(client_id, message_dict):
                 # Add student client to list
                 studentQueue.append([client_id, message_dict['name']])
                 # Construct ticket for student
-                ticket = {'ticket': len(studentQueue), 'name': message_dict['name'], 'serverId': serverId}
+                ticket = {'ticket': len(studentQueue), 'name': message_dict['name']}
+                message_ticket = {'ticket': len(studentQueue), 'name': message_dict['name'], 'serverId': serverId}
                 ticketQueue.append(ticket)
                 # Construct message for response 
-                message_response = json.dumps(ticket)
+                message_response = json.dumps(message_ticket)
                 # Encode message
                 message_response = str.encode(message_response)
                 # Send response to student
@@ -177,7 +181,6 @@ def protocol_Subscribe(client_id, message_dict):
         if client_id not in subsQueue:
             subsQueue.append(client_id)
             print('\t\tServer: Client successfully subscribed...\n')
-        
         else:
             print('\t\tServer: Client is already subscribed...\n')
             
@@ -197,13 +200,11 @@ def protocol_Subscribe(client_id, message_dict):
             if client_id in subsQueue:
                 subsQueue.pop(subsQueue.index(client_id))
                 print('\t\tServer: Client has been unsubscribed...\n')
-            
             else:
                 print('\t\tServer: Client not found in queue...\n')
-
     print('\t\tServer: Subscriptions has been updated, new total is ' + str(len(subsQueue)) + '\n')
 
-def protocol_Remove(client_id, message_dict):
+def protocol_Remove(message_dict):
     # Global
     global ticketQueue, studentQueue, updateStatus, serverId
     # Check if goal is to remove student
@@ -226,7 +227,7 @@ def protocol_Remove(client_id, message_dict):
                         super[2] = student_ticket
                         super[3] = message_dict['message']
                         # Construct message for response 
-                        student_message = {'message': message_dict['message'], 'serverId': serverId}
+                        student_message = {'name': message_dict['name'], 'message': message_dict['message'], 'serverId': serverId}
                         message_response = json.dumps(student_message)
                         # Encode message
                         message_response = str.encode(message_response)
@@ -248,14 +249,14 @@ def protocol_Remove(client_id, message_dict):
                         super[2] = student_ticket
                         super[3] = message_dict['message']
                         # Construct message for response 
-                        student_message = {'message': message_dict['message'], 'serverId': serverId}
+                        student_message = {'name': message_dict['name'], 'message': message_dict['message'], 'serverId': serverId}
                         message_response = json.dumps(student_message)
                         # Encode message
                         message_response = str.encode(message_response)
                         # Send response to student
                         msg = [message_student[0], message_response]
                         socket.send_multipart(msg)
-                        # Update remaining clients in queue
+                        # Update remaining tickets in queue
                         for ticket in ticketQueue:
                             ticket['ticket'] = ticketQueue.index(ticket) + 1
                         break
@@ -309,10 +310,12 @@ print('Please input an ID for the server: ')
 serverId = str(input())
 print('\nContinue with selecting time in seconds for client timeout: ')
 t = int(input())
+print('\nAt last, select a port number for the server: ')
+port = int(input())
 
 context = zmq.Context()
 socket = context.socket(zmq.ROUTER)
-socket.bind('tcp://*:5555')
+socket.bind(f'tcp://*:{port}')
 
 print('Configuring server... Please wait...')
 
@@ -346,6 +349,7 @@ while True:
         if clientID not in heartbeatList:
             heartbeatList.append(clientID)   
         protocol_EnterQueue(clientID, messageDict)
+        print(ticketQueue)
 
     if 'subscribe' in messageDict:
         if clientID not in heartbeatList:
@@ -355,7 +359,7 @@ while True:
     if 'remove' in messageDict:
         if clientID not in heartbeatList:
             heartbeatList.append(clientID)   
-        protocol_Remove(clientID, messageDict)
+        protocol_Remove(messageDict)
         
     if not messageDict:
         if clientID not in heartbeatList:
