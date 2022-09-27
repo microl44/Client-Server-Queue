@@ -93,7 +93,7 @@ def protocol_Attend(client_id, message_dict):
             match_name = False
             # Check if supervisor client is already in class with same name
             for supervisor in supervisorList:
-                if message_dict['name'] in supervisor['name']:
+                if message_dict['name'] == supervisor['name']:
                     updateStatus = False
                     match_name = True
                     print('\tServer: A supervisor with that name is already attending class...\n')
@@ -110,13 +110,17 @@ def protocol_Attend(client_id, message_dict):
         if not supervisorList:
             print('\tServer: No supervisor attending class...\n')
         else:
+            # Remove supervisor ID
+            for superID in supervisorIDs:
+                if client_id in superID and superID[1] == message_dict['name']:
+                    updateStatus = True
+                    supervisorIDs.remove(superID)
             # Find supervisor in list and remove
             for supervisor in supervisorList:
-                if message_dict['name'] in supervisor['name']:
+                if message_dict['name'] == supervisor['name']:
                     updateStatus = True
-                    # Remove  supervisor
-                    supervisorList.pop(supervisorList.index(supervisor))
-                    supervisorIDs.pop(supervisorList.index(supervisor))
+                    # Remove supervisor
+                    supervisorList.remove(supervisor)
                     print('\tServer: A supervisor has left class...\n')
                         
 def protocol_EnterQueue(client_id, message_dict):
@@ -284,7 +288,7 @@ def protocol_Remove(message_dict):
                         super['client'] = ''
                         super['clientMessage'] = ''
                         # Construct message for response 
-                        student_message = {'message': message_dict['message'], 'serverId': serverId}
+                        student_message = {'name': message_dict['name'], 'clientMessage': message_dict['message'], 'serverId': serverId}
                         message_response = json.dumps(student_message)
                         # Encode message
                         message_response = str.encode(message_response)
@@ -302,11 +306,11 @@ def protocol_Remove(message_dict):
                         super['client'] = ''
                         super['clientMessage'] = ''
                         # Construct message for response 
-                        student_message = {'message': message_dict['message'], 'serverId': serverId}
+                        student_message = {'name': message_dict['name'], 'clientMessage': message_dict['message'], 'serverId': serverId}
                         message_response = json.dumps(student_message)
                         # Encode message
                         message_response = str.encode(message_response)
-                        # Send response to student
+                        # Send response to student  
                         msg = [studentQueue[0][0], message_response]
                         socket.send_multipart(msg)
                         break
