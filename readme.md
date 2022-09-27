@@ -1,15 +1,21 @@
-# Readme
-## Programmers
-. José Gabriel Gomez Palomäki - a20gabpa
-. Michael Rolén - a20micro 
+Readme
+Programmers
 
-## Language used
-. Python - Version 3.9
-. C# - Version 3.1
+    José Gabriel Gomez Palomäki - a20gabpa
+    Michael Rolén - a20micro
 
-## Dependencies 
-1 Python
-.. pyzmq - Installed by "pip install pyzmq"
-2 C#
-.. NetMq - Installed by "NuGet\Install-Package NetMQ -Version 4.0.1.9" with NuGet packet manager
-.. Newtonsoft.Json - Installed by "NuGet\Install-Package Newtonsoft.Json -Version 13.0.1" with NuGet packet manager
+Language used
+
+    Python - Version 3.9
+    C# - Version 3.1
+
+Dependencies
+
+    Python
+
+    pyzmq - Installed by "pip install pyzmq"
+
+    C#
+
+    NetMq - Installed by "NuGet\Install-Package NetMQ -Version 4.0.1.9" with NuGet packet manager
+    Newtonsoft.Json - Installed by "NuGet\Install-Package Newtonsoft.Json -Version 13.0.1" with NuGet packet manager
