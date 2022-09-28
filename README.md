@@ -23,3 +23,38 @@ is inputed in the three fields in the top left corner of the application window.
 For the assignment, the second model is chosen, called the Brutal Shotgun Massacre. This works by letting the client send every message to every server using multiple sockets, one for every server. The client then process all responses from the servers but only use and display the first message. The client receives the responses by "polling" over sockets and firing correct event for the socket. If one server would go down during normal operation, the client would still continue as long as one socket receives messages.
 
 However it is possible that some inconsistency exists between the servers and that clients could display different information. This could possible be solved by allowing communication between the servers, which is out of the scope for this assignment at the moment.
+
+## Supervisor API
+* Attend / join class
+
+    Used to allow supervisor with a certain name to attend or leave class. Use true to attend and false to leave class.\
+    Server to supervisor: No expected response
+
+    {
+        "attend": true,
+        "name": "\<name\>"
+    }
+
+* Help / remove first student in queue
+
+    Sent to server to remove the first student from the queue and send a message to said student.\
+    Server to supervisor: No expected response\
+    Server to student: Expected response *Queue Status*
+
+    {
+        "remove": true,
+        "name": "\<name\>",
+        "message": "\<message\>"
+    }
+
+## Updates biased on feedback
+* Server:
+    * Changed the ticket system to use a static ticket system instead of dynamic
+    * Updated the "protocol_remove" to send an more appropriate message to student
+
+* Student:
+    * Updated the way the student handles queue updates
+    * Added patch for problem with queue updates from local server
+
+* Supervisor:
+    * Removed functionality to only send message to first student due to inconveniences with a possible refactor
