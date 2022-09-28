@@ -10,6 +10,7 @@ supervisorList  = []
 ticketQueue = []
 clientIDsList = []
 heartbeatList = []
+ticketNr = 1
 serverId = '1'
 t = 15
 port = 5555
@@ -50,8 +51,6 @@ def protocol_Heartbeat():
                     # Update all clients
                     updateStatus = True
                     ticketQueue.pop(studentQueue.index(student))
-                    for ticket in ticketQueue:
-                        ticket['ticket'] = ticketQueue.index(ticket) + 1
                     studentQueue.remove(student)
                     print('\tServer: Timeout for student client...\n')
             # Dead subscribers
@@ -123,7 +122,7 @@ def protocol_Attend(client_id, message_dict):
                         
 def protocol_EnterQueue(client_id, message_dict):
     # Global
-    global updateStatus, studentQueue, ticketQueue, socket, serverId
+    global updateStatus, studentQueue, ticketQueue, socket, serverId, ticketNr
     # Check if student client wants to enter queue
     if message_dict['enterQueue']:
         # If first student client to join
@@ -132,9 +131,10 @@ def protocol_EnterQueue(client_id, message_dict):
             # Add first student
             studentQueue.append([client_id, message_dict['name']])     
             # Construct message for response
-            ticketDict = {'ticket': 1, 'name': message_dict['name']}
-            message_ticket = {'ticket': 1, 'name': message_dict['name'], 'serverId': serverId}
+            ticketDict = {'ticket': ticketNr, 'name': message_dict['name']}
+            message_ticket = {'ticket': ticketNr, 'name': message_dict['name'], 'serverId': serverId}
             ticketQueue.append(ticketDict)
+            ticketNr = ticketNr + 1
             message_response = json.dumps(message_ticket)
             # Encode message
             message_response = str.encode(message_response)
@@ -170,9 +170,10 @@ def protocol_EnterQueue(client_id, message_dict):
                 # Add student client to list
                 studentQueue.append([client_id, message_dict['name']])
                 # Construct ticket for student
-                ticket = {'ticket': len(studentQueue), 'name': message_dict['name']}
-                message_ticket = {'ticket': len(studentQueue), 'name': message_dict['name'], 'serverId': serverId}
+                ticket = {'ticket': ticketNr, 'name': message_dict['name']}
+                message_ticket = {'ticket': ticketNr, 'name': message_dict['name'], 'serverId': serverId}
                 ticketQueue.append(ticket)
+                ticketNr = ticketNr + 1
                 # Construct message for response 
                 message_response = json.dumps(message_ticket)
                 # Encode message
@@ -237,7 +238,7 @@ def protocol_Remove(message_dict):
                         super['client'] = student_ticket
                         super['clientMessage'] = message_dict['message']
                         # Construct message for response 
-                        student_message = {'name': message_dict['name'], 'clientMessage': message_dict['message'], 'serverId': serverId}
+                        student_message = {'queue' : ticketQueue, 'supervisors': supervisorList, 'serverId': serverId}
                         message_response = json.dumps(student_message)
                         # Encode message
                         message_response = str.encode(message_response)
@@ -259,16 +260,13 @@ def protocol_Remove(message_dict):
                         super['client'] = student_ticket
                         super['clientMessage'] = message_dict['message']
                         # Construct message for response 
-                        student_message = {'name': message_dict['name'], 'clientMessage': message_dict['message'], 'serverId': serverId}
+                        student_message = {'queue' : ticketQueue, 'supervisors': supervisorList, 'serverId': serverId}
                         message_response = json.dumps(student_message)
                         # Encode message
                         message_response = str.encode(message_response)
                         # Send response to student
                         msg = [message_student[0], message_response]
                         socket.send_multipart(msg)
-                        # Update remaining tickets in queue
-                        for ticket in ticketQueue:
-                            ticket['ticket'] = ticketQueue.index(ticket) + 1
                         break
         print('\t\t\tServer: Changes were made to student queue...')
     
@@ -284,10 +282,9 @@ def protocol_Remove(message_dict):
                     if message_dict['name'] in super['name']:
                         # Update values for the supervisor
                         super['status'] = 'occupied'
-                        super['client'] = ''
-                        super['clientMessage'] = ''
+                        super['clientMessage'] = message_dict['message']
                         # Construct message for response 
-                        student_message = {'name': message_dict['name'], 'clientMessage': message_dict['message'], 'serverId': serverId}
+                        student_message = {'queue' : ticketQueue, 'supervisors': supervisorList, 'serverId': serverId}
                         message_response = json.dumps(student_message)
                         # Encode message
                         message_response = str.encode(message_response)
@@ -301,11 +298,10 @@ def protocol_Remove(message_dict):
                 for super in supervisorList:
                     if message_dict['name'] in super['name']:
                         # Update values for the supervisor
-                        super['name'] = 'occupied'
-                        super['client'] = ''
-                        super['clientMessage'] = ''
+                        super['status'] = 'occupied'
+                        super['clientMessage'] = message_dict['message']
                         # Construct message for response 
-                        student_message = {'name': message_dict['name'], 'clientMessage': message_dict['message'], 'serverId': serverId}
+                        student_message = {'queue' : ticketQueue, 'supervisors': supervisorList, 'serverId': serverId}
                         message_response = json.dumps(student_message)
                         # Encode message
                         message_response = str.encode(message_response)

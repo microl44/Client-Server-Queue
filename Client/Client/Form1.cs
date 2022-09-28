@@ -6,13 +6,14 @@ using NetMQ;
 using NetMQ.Sockets;
 using System.Threading;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 
 namespace Client
 {
     public partial class Form1 : Form
     {
         //constants to change timeout and second client port
-        private const double TIMEOUT_LIMIT = 30;
+        private const double TIMEOUT_LIMIT = 70;
         private const string SECOND_CLIENT_PORT = "5556";
 
         private static string currentStudentQueue = "";
@@ -29,6 +30,8 @@ namespace Client
         private static bool isConnected;
         private static bool isInQueue = false;
         private static bool firstMessage = true;
+
+        private static JObject ticket;
 
         private static System.Diagnostics.Stopwatch stopwatch;
 
@@ -118,7 +121,6 @@ namespace Client
             {
                 string heartbeat = "{}";
                 SendMessage(heartbeat);
-                System.Diagnostics.Debug.WriteLine("heartbeat recieved and sent");
                 return;
             }
 
@@ -132,6 +134,8 @@ namespace Client
 
                 firstMessage = false;
                 Connecter.currentPlace = jsonContent.GetValue("ticket").ToString();
+                ticket = jsonContent;
+                //ticket["ticket"] = (Int64.Parse(jsonContent.GetValue("ticket").ToString()) - 1).ToString();
             }
 
             // if message is a queue update, extract the queue and add client if client doesn't exist in client list.
@@ -205,6 +209,7 @@ namespace Client
                     port = "5555";
                     username = "Micke";
                 }
+
 
                 // if port out of range
                 else if (Int64.Parse(port) > 65535)
@@ -291,10 +296,30 @@ namespace Client
                 currentSupervisorQueue = "";
                 supervisorList.Clear();
 
-                foreach (var x in Jmessage.GetValue("supervisors"))
+                //for each "client" json object in supervisors list
+                foreach (JObject x in Jmessage.GetValue("supervisors"))
                 {
                     supervisorList.Add(x["name"].ToString() + " ");
                     supervisorList.Add(x["status"].ToString() + " ");
+
+                    //if ticket equals 1 and client is null, you're probably the first
+                    if (ticket["ticket"].ToString() == "1" && (x["client"] == null || x["client"].ToString() == ""))
+                    {
+                        lastAdminMessage = x["clientMessage"].ToString();
+                        System.Diagnostics.Debug.WriteLine("reeeeee");
+                    }
+
+                    // if your ticket equals the one being assigned, set new message as admin message.
+                    if (x["client"] != null && x["client"].ToString() != "")
+                    {
+                                            
+                        JObject temp = (JObject)x["client"];
+                        
+                        if (temp["ticket"].ToString().Equals(ticket["ticket"].ToString()))
+                        {
+                            lastAdminMessage = x["clientMessage"].ToString();
+                        }
+                    }
 
                     if (x["status"].ToString() == "")
                     {
@@ -303,6 +328,8 @@ namespace Client
                             supervisorList.Add(y["name"].ToString() + " ");
                         }
                     }
+
+                    
                     //supervisorList.Add(x["clientMessage"].ToString() + " \n ");
                 }
 

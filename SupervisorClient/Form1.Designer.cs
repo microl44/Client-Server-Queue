@@ -187,6 +187,7 @@
             this.SendMessageToFirst.TabIndex = 8;
             this.SendMessageToFirst.Text = "Send Message To First";
             this.SendMessageToFirst.UseVisualStyleBackColor = true;
+            this.SendMessageToFirst.Hide();
             this.SendMessageToFirst.Click += new System.EventHandler(this.BtnSendMessageToFirst);
             // 
             // button3
